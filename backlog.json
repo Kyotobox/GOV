@@ -1,0 +1,16 @@
+{
+  "project": "Antigravity DPI",
+  "sprints": [
+    {
+      "id": "S05-DPI",
+      "name": "Hardening CLI",
+      "status": "IN_PROGRESS",
+      "goal": "Implementación de Relevo, Auto-Auditoría y Suite de Tests nativos.",
+      "tasks": [
+        {"id": "TASK-DPI-03", "label": "CLI", "desc": "Handover/Takeover", "status": "DONE"},
+        {"id": "TASK-DPI-04", "label": "GOV", "desc": "Self-Audit Mechanism", "status": "DONE"},
+        {"id": "TASK-DPI-05", "label": "TEST", "desc": "Telemetry Test Suite", "status": "DONE"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "bin/antigravity_dpi.dart": "15e69797bbf3db152f5bee0ab19770274e8e264f02611ae186342d3728312f0a",
+  "lib/antigravity_dpi.dart": "861fc071323d72f1dfbe873790668cb18c0f797d79636ad89035b04e98bc057f",
+  "lib/src/core/cache_layer.dart": "7405477e55b65e48858bfb2e303b735344d33de8b728aefff2abf72e5652e0d5",
+  "lib/src/core/parallel_runner.dart": "18e5db460e974684ba62790de66b652f521b88a796646d130cb3a722830cbaa0",
+  "lib/src/dash/dashboard_engine.dart": "94a0386112d24722004d4ea9f7a41bd99b906c904dd0416b6ac5c49a7334e3b1",
+  "lib/src/security/integrity_engine.dart": "8858a21d5bc76d5da29bae2f859c6b6bf2a4cec5a09c44cc276e102ce52a60b3",
+  "lib/src/security/sign_engine.dart": "4dad9216523c6cd5ba5afb6bea395487155fd7dc82e89b42cf3eeb94d2f770af",
+  "lib/src/security/vanguard_core.dart": "2b5783ff57a0aba3cab168a578709fc907455d1fb6beab533b1d828ee37525de",
+  "lib/src/security/vanguard_watcher.dart": "4c212efe0a311f5008e87e6cfd4ebc558f71f3f9fb52110e1acc179334b62766",
+  "lib/src/tasks/backlog_manager.dart": "5949a9ed012cac28928ca6896cf4715611ac7b205ccef25c75e4da45332c00e2",
+  "lib/src/tasks/compliance_guard.dart": "7347004a499152489235434751469e84665e3373a2066390e5e7fd2746ff0c98",
+  "lib/src/telemetry/forensic_ledger.dart": "4d7e56d443032b6c36043f5b4b3b69ee22223dc3dbbab0c3cc0c915c38e33d70",
+  "lib/src/telemetry/telemetry_monitor.dart": "67a4f31164a27e536325da69a4013d35223a04665b7fdca13342828522f00b13",
+  "lib/src/telemetry/telemetry_service.dart": "3e7e2599d4634107f6279894ec3f75aa76ac0df773f928b5805392a21ce9b0e5"
+}

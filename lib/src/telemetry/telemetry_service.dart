@@ -1,0 +1,168 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
+
+/// TelemetryService: Centralized SHS calculation and Signed Pulse system.
+/// Migrated and hardened from Base2/ops-intelligence.ps1.
+class TelemetryService {
+  static const double cpPerTool = 1.2;
+  static const double cpPerChat = 0.5;
+  static const double swellFactor = 10000.0; // 1 CP per 10k chars
+
+  /// Computes the current pulse based on interaction counters and system state.
+  Future<PulseSnapshot> computePulse({required String basePath}) async {
+    final intelDir = p.join(basePath, 'vault', 'intel');
+    final turnsFile = File(p.join(intelDir, 'session_turns.txt'));
+    final chatsFile = File(p.join(intelDir, 'chat_count.txt'));
+    final lockFile = File(p.join(basePath, '.meta', 'session.lock'));
+
+    int turns = 0;
+    if (await turnsFile.exists()) {
+      final content = await turnsFile.readAsString();
+      turns = int.tryParse(content.trim()) ?? 0;
+    }
+
+    int chats = 0;
+    if (await chatsFile.exists()) {
+      final content = await chatsFile.readAsString();
+      chats = int.tryParse(content.trim()) ?? 0;
+    }
+
+    // Swelling calculation (Core files size)
+    double swelling = await _calculateSwelling(basePath);
+
+    // Passive Fatigue (using session.lock timestamp)
+    double passiveFatigue = 0;
+    if (await lockFile.exists()) {
+      final stats = await lockFile.stat();
+      final ageMinutes = DateTime.now().difference(stats.modified).inMinutes;
+      if (ageMinutes > 5) {
+        passiveFatigue = (ageMinutes / 15.0)
+            .toDouble(); // 1 CP per 15 min inactivity
+      }
+    }
+
+    // TODO: Implement Zombie Process detection (requires platform specific logic)
+    int zombies = 0;
+
+    // Final CP calculation
+    double totalCP =
+        (turns * cpPerTool) + (chats * cpPerChat) + swelling + passiveFatigue;
+
+    // Saturation (Scaled: CP / 0.5 -> ~50 CP = 100% saturation)
+    int saturation = ((totalCP / 0.5)).round().clamp(0, 100);
+
+    final snapshot = PulseSnapshot(
+      cp: double.parse(totalCP.toStringAsFixed(1)),
+      saturation: saturation,
+      cpDetail: {
+        'tools': turns,
+        'chats': chats,
+        'swelling': double.parse(swelling.toStringAsFixed(1)),
+        'passive_fatigue': double.parse(passiveFatigue.toStringAsFixed(1)),
+        'zombies': zombies,
+        'time_tax': 0, // Placeholder for more advanced time tracking
+        'velocity_tax': 0, // Placeholder
+      },
+      timestamp: _formatTimestamp(DateTime.now()),
+    );
+
+    return snapshot;
+  }
+
+  /// Persists the pulse snapshot to intel_pulse.json with a cryptographic signature.
+  Future<void> persistPulse(
+    PulseSnapshot pulse, {
+    required String basePath,
+  }) async {
+    final pulseFile = File(
+      p.join(basePath, 'vault', 'intel', 'intel_pulse.json'),
+    );
+
+    final data = {
+      'cp': pulse.cp,
+      'saturation': pulse.saturation,
+      'cp_detail': pulse.cpDetail,
+      'timestamp': pulse.timestamp,
+      'zombies': [], // Placeholder for zombie list
+    };
+
+    // Calculate Content Hash (Signed Pulse)
+    final jsonString = jsonEncode(data);
+    final hash = sha256.convert(utf8.encode(jsonString)).toString();
+
+    data['content_hash'] = hash;
+
+    await pulseFile.writeAsString(jsonEncode(data), encoding: utf8);
+  }
+
+  /// Increment turns atomically.
+  Future<int> incrementTurns({required String basePath}) async {
+    final turnsFile = File(
+      p.join(basePath, 'vault', 'intel', 'session_turns.txt'),
+    );
+    int turns = 0;
+    if (await turnsFile.exists()) {
+      final content = await turnsFile.readAsString();
+      turns = int.tryParse(content.trim()) ?? 0;
+    }
+    turns++;
+    await turnsFile.writeAsString(turns.toString());
+    return turns;
+  }
+
+  Future<double> _calculateSwelling(String basePath) async {
+    final coreFiles = [
+      'ops-gov.ps1',
+      'ops-intelligence.ps1',
+      'backlog.json',
+      'GEMINI.md',
+      'ops-guard.ps1',
+      'ops-audit.ps1',
+    ];
+    int totalBytes = 0;
+    for (final fileName in coreFiles) {
+      final file = File(p.join(basePath, fileName));
+      if (await file.exists()) {
+        totalBytes += await file.length();
+      }
+    }
+    return (totalBytes / swellFactor);
+  }
+
+  /// Resets volatile metrics (turns/chats) in vault/intel/.
+  Future<void> resetVolatile({required String basePath}) async {
+    final turnsFile = File(
+      p.join(basePath, 'vault', 'intel', 'session_turns.txt'),
+    );
+    final chatsFile = File(
+      p.join(basePath, 'vault', 'intel', 'chat_count.txt'),
+    );
+
+    if (await turnsFile.exists()) await turnsFile.writeAsString('0');
+    if (await chatsFile.exists()) await chatsFile.writeAsString('0');
+
+    final pulse = await computePulse(basePath: basePath);
+    await persistPulse(pulse, basePath: basePath);
+  }
+
+  String _formatTimestamp(DateTime dt) {
+    return "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} "
+        "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+}
+
+class PulseSnapshot {
+  final double cp;
+  final int saturation;
+  final Map<String, dynamic> cpDetail;
+  final String timestamp;
+
+  PulseSnapshot({
+    required this.cp,
+    required this.saturation,
+    required this.cpDetail,
+    required this.timestamp,
+  });
+}
