@@ -7,6 +7,7 @@ import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
 import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
 import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
+import 'package:antigravity_dpi/src/security/sign_engine.dart';
 import 'package:path/path.dart' as p;
 
 const String version = '1.0.0';
@@ -87,27 +88,67 @@ void main(List<String> arguments) async {
 }
 
 Future<void> runAudit(String basePath) async {
-  print('--- [AUDIT] INTEGRITY & COMPLIANCE ---');
+  try {
+    print('--- [AUDIT] INTEGRITY & COMPLIANCE ---');
 
-  final integrity = IntegrityEngine();
-  // 1. Integrity Check
-  final results = await integrity.verifyAll(basePath: basePath);
-  bool allOk = true;
-  results.forEach((file, ok) {
-    if (!ok) {
-      print('  [❌] CORRUPT: $file');
-      allOk = false;
-    } else {
-      print('  [✅] OK: $file');
+    final integrity = IntegrityEngine();
+    // 1. Integrity Check
+    final results = await integrity.verifyAll(basePath: basePath);
+    
+    bool allOk = true;
+    results.forEach((file, ok) {
+      if (!ok) {
+        print('  [❌] CORRUPT: $file');
+        allOk = false;
+      } else {
+        print('  [✅] OK: $file');
+      }
+    });
+
+    if (!allOk) {
+      print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed.');
+      exit(1);
     }
-  });
 
-  if (!allOk) {
-    print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed.');
+    // 2. Compliance Guard (Scope-Lock & Referential Integrity)
+    final backlog = BacklogManager();
+    final activeTasks = await backlog.checkConcurrency(basePath: basePath);
+    
+    if (activeTasks.isNotEmpty) {
+      final taskId = activeTasks.first;
+      final compliance = ComplianceGuard();
+      
+      // Get modified files via git
+      final gitResult = await Process.run('git', ['status', '--porcelain'], workingDirectory: basePath);
+      final stdout = gitResult.stdout as String;
+      final modifiedFiles = stdout
+          .split('\n')
+          .where((l) => l.length >= 3)
+          .map((l) => l.substring(3).trim())
+          .where((f) => f.isNotEmpty)
+          .toList();
+
+      try {
+        await compliance.enforcePreBaseline(
+          taskId: taskId,
+          modifiedFiles: modifiedFiles,
+          basePath: basePath,
+        );
+        print('  [✅] COMPLIANCE-OK: $taskId');
+      } catch (e) {
+        print('  [❌] COMPLIANCE-FAIL: $e');
+        exit(1);
+      }
+    } else {
+      print('  [!] WARNING: No hay tarea activa detectada en task.md (Marcar con [/]).');
+    }
+
+    print('Audit COMPLETED.');
+  } catch (e, stack) {
+    print('[CRITICAL] Error inesperado en audit: $e');
+    print(stack);
     exit(1);
   }
-
-  print('Audit COMPLETED.');
 }
 
 Future<void> runAct(String basePath) async {
@@ -140,7 +181,7 @@ Future<void> runStatus(String basePath) async {
   );
 }
 
-Future<void> runHandover(String basePath, String? keyPath) async {
+  Future<void> runHandover(String basePath, String? keyPath) async {
   print('--- [HANDOVER] CIERRE DE SESIÓN ---');
 
   final backlogManager = BacklogManager();
@@ -167,17 +208,41 @@ Future<void> runHandover(String basePath, String? keyPath) async {
   final taskIds = pendingTasks.map((t) => t['id'] as String).toList();
 
   await vanguard.issueChallenge(
-    level: 'GATE-AMBER',
-    project: 'BASE2',
+    level: 'TACTICAL', // Mapped from GATE-AMBER for Agent UI compatibility
+    project: backlog['project'] ?? 'UNKNOWN',
     files: ['session.lock', 'intel_pulse.json'],
     basePath: basePath,
   );
 
-  // 4. Wait for signature (simulated for CLI flow, but checks for file)
+  // 4. Wait for signature
   final signed = await vanguard.waitForSignature(basePath: basePath);
   if (!signed) {
     print('[CRITICAL] Handover abortado: Se requiere firma del PO.');
     return;
+  }
+
+  // [PILLAR 2] Strict RSA Verification
+  if (keyPath != null) {
+    final sigFile = File(p.join(basePath, 'vault', 'intel', 'signature.json'));
+    final sigData = jsonDecode(await sigFile.readAsString());
+    final challengeFile = File(p.join(basePath, 'vault', 'intel', 'challenge.json'));
+    final challengeData = jsonDecode(await challengeFile.readAsString());
+
+    final signEngine = SignEngine();
+    final isValid = await signEngine.verify(
+        challenge: challengeData['challenge'],
+        files: challengeData['files'],
+        signatureBase64: sigData['signature'],
+        publicKeyXmlPath: keyPath, // Assumed to contain public key
+    );
+
+    if (!isValid) {
+      print('[CRITICAL] KERNEL-VIOLATION: Firma RSA inválida o corrupta. Handover abortado.');
+      exit(1);
+    }
+    print('[VANGUARD] Firma RSA verificada criptográficamente ✅');
+  } else {
+    print('[WARNING] No se proporcionó clave para validación estricta. Procediendo bajo riesgo.');
   }
 
   // 5. Digital Twin / Relay Generation
@@ -241,7 +306,7 @@ Future<void> runHandover(String basePath, String? keyPath) async {
   );
 
   // 8. Reset volatile metrics
-  await telemetry.resetVolatile(basePath: basePath);
+  await telemetry.resetCounters(basePath: basePath);
 
   print('Handover COMPLETADO. Sesión SELLADA.');
 }
@@ -270,10 +335,25 @@ Future<void> runTakeover(String basePath) async {
       print(
         '[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente (Status: ${lock['status']}).',
       );
-      print('[CRITICAL] BLOQUEO DE SEGURIDAD: Auditoría requerida antes de forzar el takeover.');
-      exit(1); 
+      print('[CRITICAL] BLOQUEO DE SEGURIDAD: Se requiere escalada GATE-BLACK para continuar.');
+      
+      // [PILLAR 1] GATE-BLACK Escalation
+      final vanguard = VanguardCore();
+      await vanguard.issueBlackGate(
+          project: 'Base2', 
+          description: 'Takeover override required (Inconsistent session.lock)', 
+          basePath: basePath
+      );
+      
+      final signed = await vanguard.waitForSignature(basePath: basePath, timeoutSeconds: 60);
+      if (!signed) {
+          print('[CRITICAL] BLOQUEO PERSISTENTE: Takeover abortado por falta de autorización PO.');
+          exit(1);
+      }
+      print('[VANGUARD] GATE-BLACK: Autorización PO detectada. Perdonando estado inconsistente.');
+    } else {
+      print('Último estado: ${lock['status']} (${lock['timestamp']})');
     }
-    print('Último estado: ${lock['status']} (${lock['timestamp']})');
   }
 
   // 1. Audit check
@@ -384,19 +464,30 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   final baselineFile = File(p.join(basePath, 'BASELINE.md'));
   await baselineFile.writeAsString(buffer.toString());
 
-  // 4. Issue GATE-GOLD Challenge
-  print('[INFO] Solicitando certificación PO (GATE-GOLD)...');
-  await vanguard.issueChallenge(
-    level: 'GATE-GOLD',
-    project: activeSprint['name'],
-    files: ['BASELINE.md', 'backlog.json', 'task.md'],
-    basePath: basePath,
-  );
+  // 4. Issue certification challenge
+  print('[INFO] Solicitando certificación PO (KERNEL-CORE)...');
+  try {
+    await vanguard.issueChallenge(
+      level: 'KERNEL-CORE',
+      project: backlog['project'] ?? 'UNKNOWN',
+      files: ['BASELINE.md', 'backlog.json', 'task.md'],
+      basePath: basePath,
+    );
+  } catch (e) {
+    print('[CRITICAL] Error al emitir desafío: $e');
+    // Si falla la emisión normal, intentamos Black Gate como último recurso si es crítico
+    print('[VANGUARD-EMERGENCY] Intentando escalada a BLACK-GATE...');
+    await vanguard.issueBlackGate(
+      project: 'BASE2-HARDEN',
+      description: 'Fallo crítico en flujo de baseline.',
+      basePath: basePath,
+    );
+  }
 
-  final signed = await vanguard.waitForSignature(basePath: basePath);
+  final signed = await vanguard.waitForSignature(basePath: basePath, timeoutSeconds: 60);
   if (!signed) {
-    print('[ABORT] Baseline cancelado: No se obtuvo firma del PO.');
-    return;
+    print('[ABORT] Baseline cancelado: No se obtuvo firma válida del PO.');
+    exit(1);
   }
 
   // 5. Update session.lock to BASELINE_SEALED

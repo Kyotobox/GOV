@@ -132,7 +132,7 @@ class TelemetryService {
   }
 
   /// Resets volatile metrics (turns/chats) in vault/intel/.
-  Future<void> resetVolatile({required String basePath}) async {
+  Future<void> resetCounters({required String basePath}) async {
     final turnsFile = File(
       p.join(basePath, 'vault', 'intel', 'session_turns.txt'),
     );

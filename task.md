@@ -1,6 +1,6 @@
-# SPRINT S05-DPI - Hardening CLI
-**Objetivo**: Implementación de Relevo, Auto-Auditoría y Suite de Tests nativos.
+# SPRINT S04-COMPLIANCE - Reglas de Integridad
+**Objetivo**: Integración de Compliance Guard y Scope-Lock en Baseline.
+**Fecha**: 2026-03-25
 
-- [x] **TASK-DPI-03** [CLI] Handover/Takeover
-- [x] **TASK-DPI-04** [GOV] Self-Audit Mechanism
-- [x] **TASK-DPI-05** [TEST] Telemetry Test Suite
+- [/] **TASK-DPI-S04-02** [SEC] Compliance Guard Integration
+- [ ] **TASK-DPI-S04-03** [GOV] Forensic Ledger Integration

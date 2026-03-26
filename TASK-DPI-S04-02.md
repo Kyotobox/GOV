@@ -1,7 +1,7 @@
 # TASK-DPI-S04-02: compliance_guard.dart — Scope-Lock + Referential Integrity
 
 **Sprint**: S04-COMPLIANCE
-**Label**: [DATA]
+**Label**: [SEC]
 **CP**: 5
 **Gate**: GATE-ORANGE
 **Revisor**: [ARCH] Gemini Pro
@@ -15,20 +15,28 @@ la Regla de Integridad Referencial de `GEMINI.md` §2 punto 5.
 
 ## Scope
 - `lib/src/tasks/compliance_guard.dart`
+- `bin/antigravity_dpi.dart`
+- `test/compliance_guard_test.dart`
+- `TASK-DPI-S04-02.md`
 
 ## Interfaz a Implementar
 ```dart
 class ComplianceGuard {
-  // Verifica que los archivos modificados (git diff) corresponden al label de la tarea activa
-  // Retorna lista de violaciones (vacía = OK)
-  Future<List<ScopeViolation>> checkScopeLock({
-    required String activeTaskLabel,  // UI|DATA|SHELL|GOV|PLAN|AUDIT|SEC
+  // Extrae los archivos/patrones permitidos de la sección "## Scope:" de un TASK-ID.md
+  Future<List<String>> extractScopeFromMd({
+    required String taskId,
+    required String basePath,
+  });
+
+  // Verifica que los archivos modificados corresponden al scope dinámico estricto
+  List<String> checkScopeLock({
+    required List<String> allowedScope,
     required List<String> modifiedFiles,
   });
 
   // Verifica que existe un TASK-ID.md en el root del proyecto
   // con los campos Scope y CP declarados
-  Future<ReferentialCheck> checkReferentialIntegrity({
+  Future<bool> checkReferentialIntegrity({
     required String taskId,
     required String basePath,
   });
@@ -37,25 +45,17 @@ class ComplianceGuard {
   // Lanza ComplianceException si no pasa
   Future<void> enforcePreBaseline({
     required String taskId,
+    required List<String> modifiedFiles,
     required String basePath,
   });
 }
-
-// Scope permitido por label (migrado de ops-audit.ps1)
-const Map<String, List<RegExp>> scopeRules = {
-  'UI':    [RegExp(r'lib/.*\.dart'), RegExp(r'assets/.*')],
-  'DATA':  [RegExp(r'lib/.*\.dart')],
-  'SHELL': [RegExp(r'.*\.ps1'), RegExp(r'.*\.bat'), RegExp(r'pubspec\.yaml')],
-  'GOV':   [RegExp(r'ops-.*\.ps1'), RegExp(r'.*\.md'), RegExp(r'GEMINI\.md')],
-  'SEC':   [RegExp(r'lib/src/security/.*'), RegExp(r'vault/.*')],
-  'PLAN':  [RegExp(r'.*\.md'), RegExp(r'\.meta/.*')],
-};
 ```
 
 ## DoD
-- [ ] `checkScopeLock()` replica la lógica de `Invoke-ScopeLock` para todos los labels.
-- [ ] `checkReferentialIntegrity()` verifica que el TASK-ID.md existe y tiene `Scope:` y `CP:`.
-- [ ] `enforcePreBaseline()` lanza excepción descriptiva antes de cualquier baseline.
+- [ ] extractScopeFromMd() parsea correctamente la lista de archivos de la sección "Scope".
+- [ ] checkScopeLock() verifica contra el scope dinámico extraído y abandona el uso de labels.
+- [ ] checkReferentialIntegrity() verifica que el TASK-ID.md existe y tiene `Scope:` y `CP:`.
+- [ ] enforcePreBaseline() lanza excepción descriptiva antes de cualquier baseline.
 - [ ] Tests: escenario con archivo fuera de scope detecta violación correctamente.
 
 ## Baseline
