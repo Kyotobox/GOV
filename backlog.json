@@ -7,28 +7,192 @@
       "status": "DONE",
       "goal": "Implementación de Relevo, Auto-Auditoría y Suite de Tests nativos.",
       "tasks": [
-        {"id": "TASK-DPI-03", "label": "CLI", "desc": "Handover/Takeover", "status": "DONE"},
-        {"id": "TASK-DPI-04", "label": "GOV", "desc": "Self-Audit Mechanism", "status": "DONE"},
-        {"id": "TASK-DPI-05", "label": "TEST", "desc": "Telemetry Test Suite", "status": "DONE"}
+        {
+          "id": "TASK-DPI-03",
+          "label": "CLI",
+          "desc": "Handover/Takeover",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-04",
+          "label": "GOV",
+          "desc": "Self-Audit Mechanism",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-05",
+          "label": "TEST",
+          "desc": "Telemetry Test Suite",
+          "status": "DONE"
+        }
       ]
     },
     {
-      "id": "S04-COMPLIANCE",
-      "name": "Reglas de Integridad",
+      "id": "S06-CLI",
+      "name": "Endurecimiento del CLI (gov)",
       "status": "DONE",
-      "goal": "Integración de Compliance Guard y Scope-Lock en Baseline.",
+      "goal": "Refactorización y robustez de comandos core (act, audit, status).",
       "tasks": [
-        {"id": "TASK-DPI-S04-02", "label": "SEC", "desc": "Compliance Guard Integration", "status": "DONE"},
-        {"id": "TASK-DPI-S04-03", "label": "GOV", "desc": "Forensic Ledger Integration", "status": "DONE"}
+        {
+          "id": "TASK-DPI-S06-01",
+          "label": "CLI",
+          "desc": "Harden CLI core commands",
+          "status": "DONE"
+        }
       ]
     },
     {
-      "id": "S101-GOV",
-      "name": "Hardening Auditivo y de Estado",
-      "status": "IN_PROGRESS",
-      "goal": "Consolidación de Auditoría, Alertas y Reconciliación del Kernel.",
+      "id": "S07-GOV",
+      "name": "Gobernanza y Auditoría Estricta",
+      "status": "DONE",
+      "goal": "Implementación de auditoría profunda y validación de hashes.",
       "tasks": [
-        {"id": "TASK-DPI-S101-01", "label": "GOV", "desc": "Atomic State Reconciliation", "status": "PENDING"}
+        {
+          "id": "TASK-DPI-S07-01",
+          "label": "GOV",
+          "desc": "Strict self-audit implementation",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S07-02",
+          "label": "GOV",
+          "desc": "Hash validation and strict audit",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S08-DPI",
+      "name": "Persistencia de Telemetría",
+      "status": "DONE",
+      "goal": "Implementar persistencia de CP y SHS en el historial.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S08-01",
+          "label": "TEL",
+          "desc": "Cognitive fatigue persistence",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S09-FINAL",
+      "name": "Cierre y Baseline Final",
+      "status": "DONE",
+      "goal": "Consolidación de telemetría y ejecución de Handover formal.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S09-01",
+          "label": "FINAL",
+          "desc": "Final telemetry consolidation and handover",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S10-FLEET",
+      "name": "Auditoría Transversal (Fleet Audit)",
+      "status": "DONE",
+      "goal": "Automatizar la auditoría secuencial de todos los repositorios del ecosistema Base2.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S10-01",
+          "label": "OPS",
+          "desc": "Creación del orquestador gov-fleet-audit",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S10-02",
+          "label": "CLI",
+          "desc": "Comando 'gov pack' para exportar ZIP de auditoría",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S11-HOTFIX",
+      "name": "Mitigación Crítica (Prioridad 0)",
+      "status": "IN_PROGRESS",
+      "goal": "Remediar vulnerabilidades explotables en cadena y Audit Gap del empaquetador.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S11-01",
+          "label": "SEC",
+          "desc": "PackEngine Audit Gap Fix (VUL-10, VUL-13)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S11-02",
+          "label": "SEC",
+          "desc": "Vanguard Authorization Fixes (VUL-05, VUL-06)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S11-03",
+          "label": "SEC",
+          "desc": "Session Lock HMAC (VUL-16)",
+          "status": "PENDING"
+        }
+      ]
+    },
+    {
+      "id": "S12-INTEGRITY",
+      "name": "Integridad Criptográfica",
+      "status": "PENDING",
+      "goal": "Blindaje de firmas y validaciones cruzadas (Prioridad 1).",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S12-01",
+          "label": "SEC",
+          "desc": "SignEngine & CLI Key Hardening (VUL-01, VUL-02)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S12-02",
+          "label": "SEC",
+          "desc": "Cross-Validation & Manifest Signatures (VUL-07, VUL-08)",
+          "status": "PENDING"
+        }
+      ]
+    },
+    {
+      "id": "S13-IMMUTABILITY",
+      "name": "Inmutabilidad y Anti-Evasión",
+      "status": "PENDING",
+      "goal": "Prevenir Path Traversal, ZipSlip y envenenamiento de Ledger (Prioridad 2).",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S13-01",
+          "label": "GOV",
+          "desc": "ForensicLedger Mutex & Anchoring (VUL-11, VUL-12)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S13-02",
+          "label": "SEC",
+          "desc": "Path Traversal & ZipSlip Protection (VUL-14, VUL-19)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S13-03",
+          "label": "SEC",
+          "desc": "Orphan Substring Bypass Fix (VUL-09)",
+          "status": "PENDING"
+        }
+      ]
+    },
+    {
+      "id": "S14-ERGONOMICS",
+      "name": "Deuda Técnica y Pulido",
+      "status": "PENDING",
+      "goal": "Mejoras operativas no bloqueantes (Prioridad 3).",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S14-01",
+          "label": "PERF",
+          "desc": "Code Debt & Polling (VUL-03, VUL-04, VUL-23)",
+          "status": "PENDING"
+        }
       ]
     }
   ]

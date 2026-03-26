@@ -35,6 +35,19 @@ class TelemetryService {
     // Swelling calculation (Core files size)
     double swelling = await _calculateSwelling(basePath);
 
+    double finalCarryOver = carryOverCP;
+    
+    // Read inherited fatigue from session.lock if not provided
+    if (finalCarryOver == 0.0 && await sessionLock.exists()) {
+      try {
+        final lockContent = await sessionLock.readAsString();
+        final lockData = jsonDecode(lockContent);
+        finalCarryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
+      } catch (_) {
+        // Fallback if JSON is corrupt or field missing
+      }
+    }
+
     // Passive Fatigue (using session.lock timestamp)
     double passiveFatigue = 0;
     if (await sessionLock.exists()) {
@@ -46,7 +59,7 @@ class TelemetryService {
     }
 
     // Final CP calculation including Carry-Over
-    double totalCP = (turns * cpPerTool) + (chats * cpPerChat) + swelling + passiveFatigue + carryOverCP;
+    double totalCP = (turns * cpPerTool) + (chats * cpPerChat) + swelling + passiveFatigue + finalCarryOver;
 
     // Saturation (Scaled: CP / 0.5 -> ~50 CP = 100% saturation)
     int saturation = ((totalCP / 0.5)).round().clamp(0, 100);
@@ -59,7 +72,7 @@ class TelemetryService {
         'chats': chats,
         'swelling': double.parse(swelling.toStringAsFixed(1)),
         'passive_fatigue': double.parse(passiveFatigue.toStringAsFixed(1)),
-        'carry_over': carryOverCP,
+        'carry_over': finalCarryOver,
         'time_tax': 0,
         'velocity_tax': 0,
       },

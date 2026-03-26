@@ -9,6 +9,7 @@ import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
 import 'package:antigravity_dpi/src/security/sign_engine.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
+import 'package:antigravity_dpi/src/core/pack_engine.dart';
 import 'package:path/path.dart' as p;
 
 const String version = '1.0.0';
@@ -31,6 +32,7 @@ void main(List<String> arguments) async {
     ..addCommand('takeover')
     ..addCommand('status')
     ..addCommand('vault')
+    ..addCommand('pack')
     ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
     ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
 
@@ -42,7 +44,8 @@ void main(List<String> arguments) async {
     return;
   }
 
-  final basePath = results['path'] ?? Directory.current.path;
+  var basePath = (results['path'] ?? Directory.current.path) as String;
+  basePath = basePath.replaceAll('"', '').trim();
   final keyPath = results['key'] as String?;
   final command = results.command?.name;
 
@@ -67,6 +70,9 @@ void main(List<String> arguments) async {
     case 'status':
       await runStatus(basePath);
       break;
+    case 'pack':
+      await runPack(basePath);
+      break;
     case 'handover':
       await runHandover(basePath, results['key']);
       break;
@@ -79,8 +85,18 @@ void main(List<String> arguments) async {
 }
 
 Future<void> runAudit(String basePath) async {
+  print('--- [AUDIT] INTEGRITY & COMPLIANCE ---');
+  final vaultDir = Directory(p.join(basePath, 'vault'));
+  if (!await vaultDir.exists()) {
+    await vaultDir.create(recursive: true);
+  }
+  final logPath = p.join(basePath, 'vault', 'audit.log');
+  print('DEBUG: Abriendo log en $logPath');
+  final logFile = File(logPath);
+  IOSink? logSink;
   try {
-    print('--- [AUDIT] INTEGRITY & COMPLIANCE ---');
+    logSink = logFile.openWrite(mode: FileMode.write);
+    logSink.writeln('--- AUDIT REPORT [${DateTime.now()}] ---');
 
     final integrity = IntegrityEngine();
     final results = await integrity.verifyAll(basePath: basePath);
@@ -89,14 +105,17 @@ Future<void> runAudit(String basePath) async {
     results.forEach((file, ok) {
       if (!ok) {
         print('  [❌] CORRUPT: $file');
+        logSink!.writeln('[❌] INTEGRITY-FAIL: $file');
         allOk = false;
       } else {
         print('  [✅] OK: $file');
+        logSink?.writeln('[✅] INTEGRITY-OK: $file');
       }
     });
 
     if (!allOk) {
-      print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed.');
+        logSink!.writeln('[CRITICAL] KERNEL-VIOLATION DETECTED.');
+      print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed. Check vault/audit.log');
       exit(1);
     }
 
@@ -107,7 +126,7 @@ Future<void> runAudit(String basePath) async {
       final taskId = activeTasks.first;
       final compliance = ComplianceGuard();
       
-      final gitResult = await Process.run('git', ['status', '--porcelain'], workingDirectory: basePath);
+      final gitResult = await Process.run('git', ['status', '--porcelain', '--untracked-files=all'], workingDirectory: basePath);
       final stdout = gitResult.stdout as String;
       final modifiedFiles = stdout.split('\n')
           .where((l) => l.length >= 3)
@@ -118,6 +137,7 @@ Future<void> runAudit(String basePath) async {
       try {
         await compliance.enforcePreBaseline(taskId: taskId, modifiedFiles: modifiedFiles, basePath: basePath);
         print('  [✅] COMPLIANCE-OK: $taskId');
+        logSink?.writeln('[✅] COMPLIANCE-OK: $taskId');
 
         final ledger = ForensicLedger();
         await ledger.appendEntry(
@@ -129,10 +149,26 @@ Future<void> runAudit(String basePath) async {
         );
       } catch (e) {
         print('  [❌] COMPLIANCE-FAIL: $e');
+        logSink?.writeln('[❌] COMPLIANCE-FAIL: $e');
         exit(1);
       }
     } else {
       print('  [!] WARNING: No hay tarea activa detectada en task.md (Marcar con [/]).');
+        logSink!.writeln('[!] WARNING: No active task detected.');
+    }
+
+    // 4. Strict Orphan Detection (TASK-DPI-S07-02)
+    final orphans = await integrity.detectOrphans(
+      basePath: basePath,
+      knownFiles: results.keys.toList(),
+    );
+    
+    if (orphans.isNotEmpty) {
+      print('\n  [!] WARNING: Archivos huérfanos detectados en el root:');
+      for (final orphan in orphans) {
+        print('      - $orphan');
+      }
+      print('  (Asegúrate de registrar archivos críticos en vault/kernel.hashes)\n');
     }
 
     print('Audit COMPLETED.');
@@ -140,6 +176,8 @@ Future<void> runAudit(String basePath) async {
     print('[CRITICAL] Error inesperado en audit: $e');
     print(stack);
     exit(1);
+  } finally {
+    await logSink?.close();
   }
 }
 
@@ -162,21 +200,48 @@ Future<void> runAct(String basePath) async {
   final backlogManager = BacklogManager();
   final activeTasks = await backlogManager.checkConcurrency(basePath: basePath);
   final ledger = ForensicLedger();
-  await ledger.appendEntry(
+  
+  final taskId = activeTasks.isNotEmpty ? activeTasks.first : 'S06-GENERAL';
+  
+  try {
+    await ledger.appendEntry(
       sessionId: 'ACT-${DateTime.now().millisecondsSinceEpoch}', 
       type: 'EXEC', 
-      task: activeTasks.isNotEmpty ? activeTasks.first : 'S04-GENERAL', 
+      task: taskId, 
       detail: 'Pulse: ${pulse.saturation}% sat, ${pulse.cp} CP', 
       basePath: basePath
-  );
-
-  print('Pulse PERSISTED.');
+    );
+    print('[✅] Pulse PERSISTIDO en historial.');
+  } catch (e) {
+    print('[⚠️] WARNING: No se pudo persistir el pulso en el historial: $e');
+  }
 }
 
 Future<void> runStatus(String basePath) async {
-  final telemetry = TelemetryService();
-  final pulse = await telemetry.computePulse(basePath: basePath);
-  print('Status: ${pulse.saturation}% saturated. ${pulse.cp} complexity points.');
+  try {
+    final telemetry = TelemetryService();
+    final lockFile = File(p.join(basePath, 'session.lock'));
+    
+    double carryOver = 0.0;
+    String sessionState = 'UNKNOWN';
+    
+    if (await lockFile.exists()) {
+      final lockData = jsonDecode(await lockFile.readAsString());
+      sessionState = lockData['status'] ?? 'UNKNOWN';
+      carryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: carryOver);
+    
+    print('--- [GOV] PROJECT STATUS ---');
+    print('Estado Sesión: $sessionState');
+    print('Saturación:    ${pulse.saturation}%');
+    print('Puntos CP:     ${pulse.cp} (Heredado: $carryOver)');
+    print('----------------------------');
+  } catch (e) {
+    print('[CRITICAL] Fallo al recuperar estado: $e');
+    exit(1);
+  }
 }
 
 Future<void> runHandover(String basePath, String? keyPath) async {
@@ -345,4 +410,36 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   );
 
   print('Baseline COMPLETADO. Sprint ${activeSprint['id']} SELLADO con éxito.');
+}
+
+Future<void> runPack(String basePath) async {
+  try {
+    print('--- [PACK] EXPORTACIÓN PARA AUDITORÍA ---');
+    
+    // 1. Mandatory Audit
+    print('[INFO] Ejecutando auditoría previa...');
+    await runAudit(basePath);
+
+    // 2. Packaging
+    final packer = PackEngine();
+    final zipPath = await packer.pack(basePath: basePath);
+
+    final ledger = ForensicLedger();
+    await ledger.appendEntry(
+      sessionId: 'PACK-${DateTime.now().millisecondsSinceEpoch}',
+      type: 'SNAP',
+      task: 'PACK',
+      detail: 'Project exported to ZIP: ${p.basename(zipPath)}',
+      basePath: basePath,
+    );
+
+    print('\n----------------------------------------');
+    print('  [GOV] EXPORTACIÓN EXITOSA');
+    print('  Archivo: $zipPath');
+    print('----------------------------------------\n');
+  } catch (e, stack) {
+    print('[CRITICAL] Error en pack: $e');
+    print(stack);
+    exit(1);
+  }
 }

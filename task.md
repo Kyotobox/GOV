@@ -1,5 +1,6 @@
-# SPRINT S101-GOV - Hardening Auditivo y de Estado
-**Objetivo**: Consolidación de Auditoría, Alertas y Reconciliación del Kernel.
+# SPRINT S11-HOTFIX - Mitigación Crítica (Prioridad 0)
+**Objetivo**: Remediar vulnerabilidades explotables en cadena y Audit Gap del empaquetador.
 
-- [x] **TASK-DPI-S101-01** [GOV] Atomic State Reconciliation
-- [/] **TASK-DPI-S08-01** [TELEMETRY] Telemetry Engine Hardening
+- [/] **TASK-DPI-S11-01** [SEC] PackEngine Audit Gap Fix (VUL-10, VUL-13)
+- [ ] **TASK-DPI-S11-02** [SEC] Vanguard Authorization Fixes (VUL-05, VUL-06)
+- [ ] **TASK-DPI-S11-03** [SEC] Session Lock HMAC (VUL-16)

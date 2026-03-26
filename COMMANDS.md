@@ -18,6 +18,9 @@ Verificación profunda de integridad y cumplimiento.
 Muestra un resumen rápido del estado cognitivo de la sesión.
 - **Métricas**: Porcentaje de saturación (SHS) y Puntos de Complejidad (CP) acumulados.
 
+### `gov pack`
+Ejecuta una auditoría de integridad y, si es correcta, genera un archivo `audit_export.zip` omitiendo directorios técnicos (`.git`, `build`, etc.).
+
 ### `gov baseline`
 Sella los cambios actuales con una firma criptográfica.
 - **Acción**: Realiza los checks de `audit` y, si son exitosos, procede con el commit y la firma RSA del PO/AI.

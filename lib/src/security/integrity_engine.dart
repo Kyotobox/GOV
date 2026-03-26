@@ -94,4 +94,31 @@ class IntegrityEngine {
     print('[INFO] Self-Audit PASSED. Integridad de la herramienta verificada.');
     return true;
   }
+
+  /// Detects files in the root directory that are NOT in the manifest.
+  /// (TASK-DPI-S07-02: Strict Audit)
+  Future<List<String>> detectOrphans({
+    required String basePath,
+    required List<String> knownFiles,
+  }) async {
+    final rootDir = Directory(basePath);
+    final orphans = <String>[];
+    
+    final entries = await rootDir.list().where((e) => e is File).toList();
+    final systemPrefixes = ['.', 'lib', 'bin', 'test', 'vault', 'pubspec', 'analysis_options'];
+
+    for (var entity in entries) {
+      final name = p.basename(entity.path);
+      
+      // Skip system directories and hidden files
+      if (systemPrefixes.any((prefix) => name.startsWith(prefix))) continue;
+      
+      // Skip known files in manifest
+      if (knownFiles.contains(name)) continue;
+
+      orphans.add(name);
+    }
+
+    return orphans;
+  }
 }

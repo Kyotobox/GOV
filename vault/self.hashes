@@ -1,16 +1,17 @@
 {
-  "bin/antigravity_dpi.dart": "a53bb6ab06af704240a9202977b95504e4c8f8ccef7c02afe6576a22697ceae1",
+  "bin/antigravity_dpi.dart": "4495a178f686a4319c998dc52c79b47611728b3d1cfbf78465f633796d49dbe5",
   "lib/antigravity_dpi.dart": "861fc071323d72f1dfbe873790668cb18c0f797d79636ad89035b04e98bc057f",
   "lib/src/core/cache_layer.dart": "7405477e55b65e48858bfb2e303b735344d33de8b728aefff2abf72e5652e0d5",
+  "lib/src/core/pack_engine.dart": "4c01aad9611fb3537a88ea6bbe8964f9c6c9c3caf107e269078c3eda23847b1a",
   "lib/src/core/parallel_runner.dart": "18e5db460e974684ba62790de66b652f521b88a796646d130cb3a722830cbaa0",
   "lib/src/dash/dashboard_engine.dart": "94a0386112d24722004d4ea9f7a41bd99b906c904dd0416b6ac5c49a7334e3b1",
-  "lib/src/security/integrity_engine.dart": "8858a21d5bc76d5da29bae2f859c6b6bf2a4cec5a09c44cc276e102ce52a60b3",
+  "lib/src/security/integrity_engine.dart": "e5198c9f659c8398d35e5ef17de302754801ef8d8888ab4f3e8a1fc6a7d02a99",
   "lib/src/security/sign_engine.dart": "991cd89426a5e858f15d48730f74d6a9f102b106984ec9afaafd8bc1a4db7976",
   "lib/src/security/vanguard_core.dart": "e74f1bb6d22dbad3bd50b8dd1c83232f670bd343b6b1f8803ade5ee12e41d11e",
   "lib/src/security/vanguard_watcher.dart": "c5af3f5f56405db997080cafb5183093225167aa2997d9d3a6a5ec72dcde2a28",
   "lib/src/tasks/backlog_manager.dart": "fd2fae19c1fa5ef4f1ba60da8c6783410fb75dc3216b8a7a070a76a9fa3fb9d2",
-  "lib/src/tasks/compliance_guard.dart": "756b89607e7172d67b56a17d0e08d59c7797b4b3178dc9e80db8d25059cd3172",
+  "lib/src/tasks/compliance_guard.dart": "8398ec69719375de06ed294654b1a07c63bea1c8612e3d2c4bb42e8fbc61267f",
   "lib/src/telemetry/forensic_ledger.dart": "600195efd048762d676dfa0b7f8a9f0f03c04f28ead0479ca97ecc727807d12e",
   "lib/src/telemetry/telemetry_monitor.dart": "67a4f31164a27e536325da69a4013d35223a04665b7fdca13342828522f00b13",
-  "lib/src/telemetry/telemetry_service.dart": "df4fd34f93c837111c1776ca16deaca16dbdd834a2e9fe8fab7ff80195824807"
+  "lib/src/telemetry/telemetry_service.dart": "90a822b3b715788c5b6de15af238e7f99f3b5f5ce911087733bcfba7078ec858"
 }

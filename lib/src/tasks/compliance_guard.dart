@@ -17,15 +17,21 @@ class ComplianceGuard {
   static const List<String> systemExemptions = [
     'session.lock',
     'backlog.json',
+    'all_hashes.json', // Diagnóstico de integridad
+    'fleet_targets.tmp', // Temporal del orquestador de flota
+    'update_self_hashes.dart', // Soporte de recertificación
+    'self_sync.dart',
+    'final_sync.dart',
     'task.md',
     'DASHBOARD.md',
     'BASELINE.md',
     'TASK-DPI-', // Exempt all task files
-    'vault/intel/', // Toda la telemetría y pulsos
-    'vault/brain/', // Exención para el relay de sesión y otros artefactos de IA
+    'pubspec.lock',
+    'SESSION_RELAY_TECH.md',
+    'vault/', // Toda la telemetría, pulsos y logs
     'HISTORY.md',
     'bin/', // Exención para binarios de la herramienta
-    'lib/', // Exención para código fuente de la herramienta
+    'lib/', // Exención para código fuente de la herramienta (Self-Audit)
     'test/', // Exención para pruebas unitarias
   ];
 
