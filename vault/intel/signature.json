@@ -1,1 +1,5 @@
-{"signature": "MOCK_SESSION_CERT", "po": "PO_TEST"}
+﻿{
+    "timestamp":  "2026-03-26T08:57:06.1373363-04:00",
+    "signature":  "WNrxG8vQdLHc6yNAqHEnLeD1Kl+HP2ozKaPV2T2Arcjk+yU5vXHn6l9dR/fEMUY9JdJTsX1Ss8goz0JFlOMPV8X8PN21LFEZGQ9SgiMUqxzyKWaZj+vvPIC6dgx8/VDyLrgrX8ebH7KtEgFRLrUJxqRDx3wcllimhdgiXrFEPL01c9y/xK2jPIdRNg08jtsXq/A4PA/u5wAQQ9cyfBMGWiSvm9SKxyHbkoOIbyIVwrvVkWfjD3AWDI+QSlidkL1Wb22UFEe9goUUksfcGyFt3y1yFnSmbw/y+eY10k2w4lh15Yre0tNg5gQMzRSwprk8W9+e8v7d6KYHrP+C2tiLnA==",
+    "challenge":  "AUTH-20260326T051701-5875"
+}

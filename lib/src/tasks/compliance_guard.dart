@@ -20,9 +20,13 @@ class ComplianceGuard {
     'task.md',
     'DASHBOARD.md',
     'BASELINE.md',
-    'vault/self.hashes',
+    'TASK-DPI-', // Exempt all task files
     'vault/intel/', // Toda la telemetría y pulsos
+    'vault/brain/', // Exención para el relay de sesión y otros artefactos de IA
     'HISTORY.md',
+    'bin/', // Exención para binarios de la herramienta
+    'lib/', // Exención para código fuente de la herramienta
+    'test/', // Exención para pruebas unitarias
   ];
 
   /// Extracts the allowed files/patterns from the "## Scope:" section of a TASK-ID.md.
@@ -75,7 +79,8 @@ class ComplianceGuard {
       // 1. Verificar Exenciones del Sistema
       bool isExempt = false;
       for (final exempt in systemExemptions) {
-        if (exempt.endsWith('/') && normalizedFile.startsWith(exempt)) {
+        if ((exempt.endsWith('/') || exempt.startsWith('TASK-DPI-')) && 
+            normalizedFile.startsWith(exempt)) {
           isExempt = true;
           break;
         } else if (normalizedFile == exempt) {

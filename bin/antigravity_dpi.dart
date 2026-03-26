@@ -235,7 +235,9 @@ Future<void> runHandover(String basePath, String? keyPath) async {
 Future<void> runTakeover(String basePath) async {
   print('--- [TAKEOVER] RECUPERACIÓN DE SESIÓN ---');
   final backlogManager = BacklogManager();
-  final conflicts = await backlogManager.checkConcurrency(basePath: basePath);
+  final telemetry = TelemetryService();
+  double inheritedCP = 0.0;
+  String? lastHash;
   
   final lockFile = File(p.join(basePath, 'session.lock'));
   if (lockFile.existsSync()) {
@@ -244,6 +246,19 @@ Future<void> runTakeover(String basePath) async {
       print('[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente.');
       exit(1);
     }
+    inheritedCP = (lock['shs_at_close'] as num?)?.toDouble() ?? 0.0;
+    lastHash = lock['git_hash'] as String?;
+  }
+
+  // ALIGNMENT: Ensure we are on master to avoid detached HEAD drift
+  await Process.run('git', ['checkout', 'master'], workingDirectory: basePath);
+
+  // 2. Verificar Git Hash (HARD-STOP)
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final currentHash = (gitResult.stdout as String).trim();
+  if (lastHash != null && lastHash != currentHash) {
+    print('[CRITICAL] GIT-DRIFT: El hash actual ($currentHash) no coincide con el cierre ($lastHash). Abortando para proteger integridad.');
+    exit(1);
   }
 
   await runAudit(basePath);
@@ -251,22 +266,44 @@ Future<void> runTakeover(String basePath) async {
   final lockData = jsonEncode({
     'status': 'IN_PROGRESS',
     'timestamp': DateTime.now().toIso8601String(),
+    'inherited_fatigue': inheritedCP,
   });
   await lockFile.writeAsString(lockData);
 
   final backlog = await backlogManager.loadBacklog(basePath: basePath);
   final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
 
+  // 3. Búsqueda de Tarea Objetivo
+  String targetTask = 'S04-GENERAL';
+  if (activeSprint != null) {
+    final tasks = activeSprint['tasks'] as List?;
+    if (tasks != null) {
+      final pending = tasks.firstWhere((t) => t['status'] == 'PENDING', orElse: () => null);
+      if (pending != null) {
+        targetTask = pending['id'];
+      }
+    }
+  }
+
+  // 4. Cálculo de Pulso Real
+  final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: inheritedCP);
+
   final ledger = ForensicLedger();
   await ledger.appendEntry(
     sessionId: activeSprint?['id'] ?? 'S04-GENERAL',
     type: 'SNAP',
     task: 'TAKEOVER',
-    detail: 'Takeover success.',
+    detail: 'Takeover success. Inherited CP: $inheritedCP',
     basePath: basePath,
   );
 
-  print('Takeover EXITOSO. Kernel Base2 LISTO.');
+  // 5. Consola Táctica
+  print('\n----------------------------------------');
+  print('  [GOV] TAKEOVER EXITOSO');
+  print('  Saturación Real: ${pulse.saturation}% (CP: ${pulse.cp})');
+  print('  Tarea Objetivo:  $targetTask');
+  print('\n[STATUS] Sesión reanudada con persistencia de fatiga heredada.');
+  print('----------------------------------------\n');
 }
 
 Future<void> runBaseline(String basePath, String? keyPath) async {

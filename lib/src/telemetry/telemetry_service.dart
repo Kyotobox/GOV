@@ -11,11 +11,14 @@ class TelemetryService {
   static const double swellFactor = 10000.0; // 1 CP per 10k chars
 
   /// Computes the current pulse based on interaction counters and system state.
-  Future<PulseSnapshot> computePulse({required String basePath}) async {
+  Future<PulseSnapshot> computePulse({
+    required String basePath,
+    double carryOverCP = 0.0,
+  }) async {
     final intelDir = p.join(basePath, 'vault', 'intel');
     final turnsFile = File(p.join(intelDir, 'session_turns.txt'));
     final chatsFile = File(p.join(intelDir, 'chat_count.txt'));
-    final lockFile = File(p.join(basePath, '.meta', 'session.lock'));
+    final sessionLock = File(p.join(basePath, 'session.lock'));
 
     int turns = 0;
     if (await turnsFile.exists()) {
@@ -34,21 +37,16 @@ class TelemetryService {
 
     // Passive Fatigue (using session.lock timestamp)
     double passiveFatigue = 0;
-    if (await lockFile.exists()) {
-      final stats = await lockFile.stat();
+    if (await sessionLock.exists()) {
+      final stats = await sessionLock.stat();
       final ageMinutes = DateTime.now().difference(stats.modified).inMinutes;
       if (ageMinutes > 5) {
-        passiveFatigue = (ageMinutes / 15.0)
-            .toDouble(); // 1 CP per 15 min inactivity
+        passiveFatigue = (ageMinutes / 15.0).toDouble(); // 1 CP per 15 min inactivity
       }
     }
 
-    // TODO: Implement Zombie Process detection (requires platform specific logic)
-    int zombies = 0;
-
-    // Final CP calculation
-    double totalCP =
-        (turns * cpPerTool) + (chats * cpPerChat) + swelling + passiveFatigue;
+    // Final CP calculation including Carry-Over
+    double totalCP = (turns * cpPerTool) + (chats * cpPerChat) + swelling + passiveFatigue + carryOverCP;
 
     // Saturation (Scaled: CP / 0.5 -> ~50 CP = 100% saturation)
     int saturation = ((totalCP / 0.5)).round().clamp(0, 100);
@@ -61,9 +59,9 @@ class TelemetryService {
         'chats': chats,
         'swelling': double.parse(swelling.toStringAsFixed(1)),
         'passive_fatigue': double.parse(passiveFatigue.toStringAsFixed(1)),
-        'zombies': zombies,
-        'time_tax': 0, // Placeholder for more advanced time tracking
-        'velocity_tax': 0, // Placeholder
+        'carry_over': carryOverCP,
+        'time_tax': 0,
+        'velocity_tax': 0,
       },
       timestamp: _formatTimestamp(DateTime.now()),
     );
@@ -133,16 +131,13 @@ class TelemetryService {
 
   /// Resets volatile metrics (turns/chats) in vault/intel/.
   Future<void> resetCounters({required String basePath}) async {
-    final turnsFile = File(
-      p.join(basePath, 'vault', 'intel', 'session_turns.txt'),
-    );
-    final chatsFile = File(
-      p.join(basePath, 'vault', 'intel', 'chat_count.txt'),
-    );
+    final turnsFile = File(p.join(basePath, 'vault', 'intel', 'session_turns.txt'));
+    final chatsFile = File(p.join(basePath, 'vault', 'intel', 'chat_count.txt'));
 
     if (await turnsFile.exists()) await turnsFile.writeAsString('0');
     if (await chatsFile.exists()) await chatsFile.writeAsString('0');
 
+    // After reset, re-calculate pulse (preserving carryOver if needed, but usually reset is for handover)
     final pulse = await computePulse(basePath: basePath);
     await persistPulse(pulse, basePath: basePath);
   }
