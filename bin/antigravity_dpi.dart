@@ -114,7 +114,7 @@ Future<void> runAudit(String basePath) async {
     });
 
     if (!allOk) {
-        logSink!.writeln('[CRITICAL] KERNEL-VIOLATION DETECTED.');
+        logSink?.writeln('[CRITICAL] KERNEL-VIOLATION DETECTED.');
       print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed. Check vault/audit.log');
       exit(1);
     }
@@ -227,6 +227,13 @@ Future<void> runStatus(String basePath) async {
     
     if (await lockFile.exists()) {
       final lockData = jsonDecode(await lockFile.readAsString());
+      
+      final integrity = IntegrityEngine();
+      if (!integrity.verifySessionMAC(lockData)) {
+          print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+          exit(1);
+      }
+      
       sessionState = lockData['status'] ?? 'UNKNOWN';
       carryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
     }
@@ -276,12 +283,17 @@ Future<void> runHandover(String basePath, String? keyPath) async {
   final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
   
   final lockFile = File(p.join(basePath, 'session.lock'));
-  await lockFile.writeAsString(jsonEncode({
+  final lockData = {
     'status': 'HANDOVER_SEALED',
     'timestamp': timestamp,
     'shs_at_close': pulse.saturation,
     'git_hash': gitHash,
-  }));
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
 
   await telemetry.resetCounters(basePath: basePath);
 
@@ -307,6 +319,13 @@ Future<void> runTakeover(String basePath) async {
   final lockFile = File(p.join(basePath, 'session.lock'));
   if (lockFile.existsSync()) {
     final lock = jsonDecode(await lockFile.readAsString());
+    
+    final integrity = IntegrityEngine();
+    if (!integrity.verifySessionMAC(lock)) {
+        print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+        exit(1);
+    }
+    
     if (lock['status'] != 'HANDOVER_SEALED') {
       print('[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente.');
       exit(1);
@@ -328,12 +347,16 @@ Future<void> runTakeover(String basePath) async {
 
   await runAudit(basePath);
 
-  final lockData = jsonEncode({
+  final lockData = {
     'status': 'IN_PROGRESS',
     'timestamp': DateTime.now().toIso8601String(),
     'inherited_fatigue': inheritedCP,
-  });
-  await lockFile.writeAsString(lockData);
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
 
   final backlog = await backlogManager.loadBacklog(basePath: basePath);
   final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
@@ -393,12 +416,17 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
 
   final lockFile = File(p.join(basePath, 'session.lock'));
-  await lockFile.writeAsString(jsonEncode({
+  final lockData = {
     'status': 'BASELINE_SEALED',
     'timestamp': timestamp,
     'sprint_id': activeSprint['id'],
     'git_hash': gitHash,
-  }));
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
 
   final ledger = ForensicLedger();
   await ledger.appendEntry(

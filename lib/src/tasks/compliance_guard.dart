@@ -80,35 +80,50 @@ class ComplianceGuard {
   }) {
     final violations = <String>[];
     for (final file in modifiedFiles) {
-      final normalizedFile = file.replaceAll('\\', '/');
+      // Normalización robusta para evitar Path Traversal (Vulnerabilidad B de Auditoría)
+      final normalizedFile = p.normalize(file).replaceAll('\\', '/');
 
       // 1. Verificar Exenciones del Sistema
       bool isExempt = false;
       for (final exempt in systemExemptions) {
-        if ((exempt.endsWith('/') || exempt.startsWith('TASK-DPI-')) && 
-            normalizedFile.startsWith(exempt)) {
-          isExempt = true;
-          break;
-        } else if (normalizedFile == exempt) {
+        final normalizedExempt = p.normalize(exempt).replaceAll('\\', '/');
+        
+        if (normalizedExempt.endsWith('/') || normalizedExempt.startsWith('TASK-DPI-')) {
+          if (normalizedFile.startsWith(normalizedExempt)) {
+            // Solo eximir si no estamos en un entorno donde queremos auditar la herramienta misma
+            // O si el archivo es parte de la telemetría/lock.
+            if (!normalizedFile.startsWith('lib/') && !normalizedFile.startsWith('test/')) {
+              isExempt = true;
+              break;
+            }
+          }
+        } else if (normalizedFile == normalizedExempt) {
           isExempt = true;
           break;
         }
       }
+      
+      // Casos específicos de archivos de sistema que siempre son exentos
+      if (normalizedFile == 'session.lock' || 
+          normalizedFile == 'task.md' || 
+          normalizedFile.startsWith('vault/')) {
+        isExempt = true;
+      }
+
       if (isExempt) continue;
 
       bool isAllowed = false;
       for (var pattern in allowedScope) {
-        pattern = pattern.replaceAll('\\', '/');
-        // If pattern ends with /, it's a directory
-        if (pattern.endsWith('/')) {
-          if (normalizedFile.startsWith(pattern)) {
+        final normalizedPattern = p.normalize(pattern).replaceAll('\\', '/');
+        
+        if (normalizedPattern.endsWith('/')) {
+          if (normalizedFile.startsWith(normalizedPattern)) {
             isAllowed = true;
             break;
           }
         } else {
-          // Exact match or directory prefix match
-          if (normalizedFile == pattern ||
-              normalizedFile.startsWith(pattern + '/')) {
+          if (normalizedFile == normalizedPattern ||
+              normalizedFile.startsWith(normalizedPattern + '/')) {
             isAllowed = true;
             break;
           }

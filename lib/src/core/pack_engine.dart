@@ -25,7 +25,7 @@ class PackEngine {
       '.dart_tool',
       'build',
       '.gemini',
-      'vault/audit.log', // Exclude local audit logs
+      'vault', // VUL-10: Exclude entire vault
       zipFile, // Don't pack the zip itself
     ];
 
@@ -35,14 +35,20 @@ class PackEngine {
       if (entity is File) {
         final relPath = p.relative(entity.path, from: basePath);
         
-        bool shouldExclude = false;
         final normalizedRel = relPath.replaceAll('\\', '/');
         
-        for (final ex in excludes) {
-          final normalizedEx = ex.replaceAll('\\', '/');
-          if (normalizedRel == normalizedEx || normalizedRel.startsWith(normalizedEx + '/')) {
-            shouldExclude = true;
-            break;
+        // VUL-13: Mandatory inclusion for core source directories
+        final isMandatory = normalizedRel.startsWith('lib/') || 
+                            normalizedRel.startsWith('bin/');
+        
+        bool shouldExclude = false;
+        if (!isMandatory) {
+          for (final ex in excludes) {
+            final normalizedEx = ex.replaceAll('\\', '/');
+            if (normalizedRel == normalizedEx || normalizedRel.startsWith(normalizedEx + '/')) {
+              shouldExclude = true;
+              break;
+            }
           }
         }
 

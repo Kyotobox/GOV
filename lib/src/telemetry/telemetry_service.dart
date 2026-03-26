@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
+import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 
 /// TelemetryService: Centralized SHS calculation and Signed Pulse system.
 /// Migrated and hardened from Base2/ops-intelligence.ps1.
@@ -42,9 +43,21 @@ class TelemetryService {
       try {
         final lockContent = await sessionLock.readAsString();
         final lockData = jsonDecode(lockContent);
+        
+        final integrity = IntegrityEngine();
+        if (!integrity.verifySessionMAC(lockData)) {
+            print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+            exit(1);
+        }
+        
         finalCarryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
-      } catch (_) {
-        // Fallback if JSON is corrupt or field missing
+      } catch (e) {
+        // Fallback or exit depending on security strictness. 
+        // For VUL-16, we fail hard if locked but invalid.
+        if (e is! FileSystemException) {
+            print('[CRITICAL] KERNEL-VIOLATION: Error al leer session.lock: $e');
+            exit(1);
+        }
       }
     }
 

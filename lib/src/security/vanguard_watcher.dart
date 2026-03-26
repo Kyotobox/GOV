@@ -43,8 +43,16 @@ class VanguardWatcher {
 
       print('[VANGUARD] Challenge: $challenge | Level: $level');
 
-      // Manual intervention required for KERNEL level?
-      // For this implementation, we simulate the PO signing it.
+      if (level != 'TACTICAL') {
+        stdout.write('\n[!] PRECAUCIÓN: Desafío de nivel $level detectado.\n');
+        stdout.write('¿Autorizar firma de desafío [y/N]? ');
+        final response = stdin.readLineSync();
+        if (response == null || (response.trim().toLowerCase() != 'y' && response.trim().toLowerCase() != 'yes')) {
+          print('[VANGUARD] Firma ABORTADA por el usuario.');
+          return;
+        }
+      }
+
       final signature = await _signer.sign(
         challenge: challenge,
         files: files,

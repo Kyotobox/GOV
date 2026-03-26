@@ -15,7 +15,7 @@ Resolver VUL-05 (Entropía predecible en Challenge ID) y VUL-06 (Auto-firma univ
 - `TASK-DPI-S11-02.md`
 
 ## DoD
-- [ ] Reemplazar `millisecondsSinceEpoch % 9000` en `VanguardCore.issueChallenge` por un nonce de 128-bits generado con `Random.secure()`.
-- [ ] En `VanguardWatcher._processChallenge`, leer el `level` del JSON.
-- [ ] Si el nivel NO es `TACTICAL`, solicitar confirmación manual por consola (`stdin.readLineSync()`) antes de ejecutar `_signer.sign`.
-- [ ] Abortar la firma si la confirmación manual es rechazada/vacía.
+- [x] Reemplazar `millisecondsSinceEpoch % 9000` en `VanguardCore.issueChallenge` por un nonce de 128-bits generado con `Random.secure()`.
+- [x] En `VanguardWatcher._processChallenge`, leer el `level` del JSON.
+- [x] Si el nivel NO es `TACTICAL`, solicitar confirmación manual por consola (`stdin.readLineSync()`) antes de ejecutar `_signer.sign`.
+- [x] Abortar la firma si la confirmación manual es rechazada/vacía.

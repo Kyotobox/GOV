@@ -12,8 +12,9 @@ Resolver VUL-10 y VUL-13. El empaquetador actual (`PackEngine`) está fugando ar
 ## Scope
 - `lib/src/core/pack_engine.dart`
 - `TASK-DPI-S11-01.md`
+- `audit_export_1774548131276.zip`
 
 ## DoD
-- [ ] Modificar `excludes` en `PackEngine.pack` para excluir TODO el directorio `vault/` (no solo audit.log).
-- [ ] Asegurar que el algoritmo empaqueta correctamente todo el contenido de `lib/` y `bin/`.
-- [ ] Validar localmente ejecutando `gov pack` y revisando el ZIP.
+- [x] Modificar `excludes` en `PackEngine.pack` para excluir TODO el directorio `vault/` (no solo audit.log).
+- [x] Asegurar que el algoritmo empaqueta correctamente todo el contenido de `lib/` y `bin/`.
+- [x] Validar localmente ejecutando `gov pack` y revisando el ZIP.

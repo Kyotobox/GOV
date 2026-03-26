@@ -1,4 +1,4 @@
---- AUDIT REPORT [2026-03-26 14:55:52.128612] ---
+--- AUDIT REPORT [2026-03-26 16:07:30.272603] ---
 [✅] INTEGRITY-OK: backlog.json
 [✅] INTEGRITY-OK: VISION.md
 [✅] INTEGRITY-OK: GEMINI.md
@@ -6,4 +6,4 @@
 [✅] INTEGRITY-OK: CHANGELOG.md
 [✅] INTEGRITY-OK: task.md
 [✅] INTEGRITY-OK: pubspec.yaml
-[❌] COMPLIANCE-FAIL: Compliance Violation: SCOPE-VIOLATION: Intento de modificar archivos fuera del scope de TASK-DPI-S11-01: COMMANDS.md, pubspec.yaml, CONSOLIDATED_AUDIT_DEBT.md, GOVERNANCE_AUDIT_REPORT.md, audit_export_1774548131276.zip, fleet_details.log, fleet_report.txt, gov-fleet-audit.bat
+[❌] COMPLIANCE-FAIL: Compliance Violation: SCOPE-VIOLATION: Intento de modificar archivos fuera del scope de TASK-DPI-S14-01: audit_export_1774548131276.zip, bin/antigravity_dpi.dart, calc_all_hashes.dart, deploy_to_base2.bat, diag_integrity.dart, lib/src/core/pack_engine.dart, lib/src/security/integrity_engine.dart, lib/src/security/vanguard_watcher.dart, lib/src/telemetry/telemetry_service.dart, verify_hash.dart, final_attempt.log

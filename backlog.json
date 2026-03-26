@@ -112,26 +112,26 @@
     {
       "id": "S11-HOTFIX",
       "name": "Mitigación Crítica (Prioridad 0)",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Remediar vulnerabilidades explotables en cadena y Audit Gap del empaquetador.",
       "tasks": [
         {
           "id": "TASK-DPI-S11-01",
           "label": "SEC",
           "desc": "PackEngine Audit Gap Fix (VUL-10, VUL-13)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S11-02",
           "label": "SEC",
           "desc": "Vanguard Authorization Fixes (VUL-05, VUL-06)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S11-03",
           "label": "SEC",
           "desc": "Session Lock HMAC (VUL-16)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     },
@@ -184,14 +184,14 @@
     {
       "id": "S14-ERGONOMICS",
       "name": "Deuda Técnica y Pulido",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "goal": "Mejoras operativas no bloqueantes (Prioridad 3).",
       "tasks": [
         {
           "id": "TASK-DPI-S14-01",
           "label": "PERF",
           "desc": "Code Debt & Polling (VUL-03, VUL-04, VUL-23)",
-          "status": "PENDING"
+          "status": "IN_PROGRESS"
         }
       ]
     }

@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
+import 'dart:async';
 import 'package:path/path.dart' as p;
+import 'package:watcher/watcher.dart';
 
 class VanguardCore {
   /// Generates a new challenge and writes it to vault/intel/challenge.json.
@@ -11,7 +14,11 @@ class VanguardCore {
     required String basePath,
     String description = '',
   }) async {
-    final challengeId = 'AUTH-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-${(1000 + (new DateTime.now().millisecondsSinceEpoch % 9000))}';
+    final random = Random.secure();
+    final nonce = List<int>.generate(16, (i) => random.nextInt(256));
+    final nonceHex = nonce.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+    
+    final challengeId = 'AUTH-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-$nonceHex';
     final intelDir = p.join(basePath, 'vault', 'intel');
     final challengeFile = File(p.join(intelDir, 'challenge.json'));
 
@@ -32,24 +39,43 @@ class VanguardCore {
     return challengeId;
   }
 
-  /// Watches for signature.json in vault/intel/.
-  /// (Simplified poll for this CLI context).
+  /// Watches for signature.json in vault/intel/ using a reactive watcher.
   Future<bool> waitForSignature({required String basePath, int timeoutSeconds = 30}) async {
-    final sigPath = p.join(basePath, 'vault', 'intel', 'signature.json');
+    final sigPath = p.normalize(p.join(basePath, 'vault', 'intel', 'signature.json'));
+    final intelDir = p.join(basePath, 'vault', 'intel');
     final sigFile = File(sigPath);
     
-    print('[VANGUARD] Esperando firma del PO (timeout: ${timeoutSeconds}s)...');
-    
-    for (int i = 0; i < timeoutSeconds; i++) {
-      if (await sigFile.exists()) {
-        print('[VANGUARD] Firma DETECTADA ✅');
-        return true;
-      }
-      await Future.delayed(Duration(seconds: 1));
+    if (await sigFile.exists()) {
+      print('[VANGUARD] Firma DETECTADA ✅ (Existente)');
+      return true;
     }
+
+    print('[VANGUARD] Esperando firma del PO (REACTIVO, timeout: ${timeoutSeconds}s)...');
     
-    print('[VANGUARD] Timeout: No se detectó firma.');
-    return false;
+    final completer = Completer<bool>();
+    final watcher = DirectoryWatcher(intelDir);
+    
+    final subscription = watcher.events.listen((event) {
+      final eventPath = p.normalize(event.path);
+      if (eventPath == sigPath && 
+          (event.type == ChangeType.ADD || event.type == ChangeType.MODIFY)) {
+        if (!completer.isCompleted) completer.complete(true);
+      }
+    });
+
+    try {
+      final result = await completer.future.timeout(
+        Duration(seconds: timeoutSeconds),
+        onTimeout: () => false,
+      );
+      if (result) print('[VANGUARD] Firma DETECTADA ✅ (Evento)');
+      return result;
+    } catch (e) {
+      print('[VANGUARD] Error en el watcher: $e');
+      return false;
+    } finally {
+      await subscription.cancel();
+    }
   }
 
   /// [PILLAR 1] GATE-BLACK Escalation

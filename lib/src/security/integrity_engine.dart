@@ -121,4 +121,22 @@ class IntegrityEngine {
 
     return orphans;
   }
+
+  static const String _hmacKey = 'GATE-GOLD-HMAC-SECRET-UUID-2026';
+
+  /// Generates a MAC for the session data (VUL-16).
+  String generateSessionMAC(Map<String, dynamic> data) {
+    final copy = Map<String, dynamic>.from(data)..remove('_mac');
+    final content = jsonEncode(copy);
+    final hmac = Hmac(sha256, utf8.encode(_hmacKey));
+    return hmac.convert(utf8.encode(content)).toString();
+  }
+
+  /// Verifies the MAC of the session data (VUL-16).
+  bool verifySessionMAC(Map<String, dynamic> data) {
+    if (!data.containsKey('_mac')) return false;
+    final expectedMac = data['_mac'];
+    final actualMac = generateSessionMAC(data);
+    return actualMac == expectedMac;
+  }
 }
