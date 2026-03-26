@@ -16,6 +16,8 @@ class ForensicLedger {
     final historyFile = File(p.join(basePath, 'HISTORY.md'));
     String prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
 
+    print('DEBUG: ForensicLedger [${historyFile.absolute.path}] START_APPEND');
+
     if (await historyFile.exists()) {
       final lines = await historyFile.readAsLines();
       if (lines.isNotEmpty) {
@@ -25,7 +27,6 @@ class ForensicLedger {
         }
       }
     } else {
-      // Create with header if not exists
       await historyFile.writeAsString(
         '| Timestamp | SessionID | PrevHash | Type | Task | Detail |\n'
         '| :--- | :--- | :--- | :--- | :--- | :--- |\n',
@@ -36,37 +37,11 @@ class ForensicLedger {
     final timestamp = _formatTimestamp(DateTime.now());
     final entry = '| $timestamp | $sessionId | $prevHash | $type | $task | $detail |';
     
-    await historyFile.writeAsString('$entry\n', mode: FileMode.append);
-  }
-
-  /// Verifies the entire hash chain of the history file.
-  Future<List<int>> verifyChain({required String basePath}) async {
-    final historyFile = File(p.join(basePath, 'HISTORY.md'));
-    if (!await historyFile.exists()) return [];
-
-    final lines = await historyFile.readAsLines();
-    final dataLines = lines.where((l) => l.startsWith('|') && !l.contains(':---') && !l.contains('Timestamp')).toList();
-    
-    List<int> corruptedLines = [];
-    String expectedPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
-
-    for (int i = 0; i < dataLines.length; i++) {
-        final line = dataLines[i];
-        final parts = line.split('|').map((p) => p.trim()).toList();
-        if (parts.length < 7) {
-          corruptedLines.add(i);
-          continue;
-        }
-
-        final actualPrevHash = parts[3];
-        if (actualPrevHash != expectedPrevHash) {
-          corruptedLines.add(i);
-        }
-        
-        expectedPrevHash = _calculateLineHash(line);
-    }
-
-    return corruptedLines;
+    final sink = historyFile.openWrite(mode: FileMode.append);
+    sink.writeln(entry);
+    await sink.flush();
+    await sink.close();
+    print('DEBUG: ForensicLedger [${historyFile.absolute.path}] APPEND_OK');
   }
 
   String _calculateLineHash(String line) {

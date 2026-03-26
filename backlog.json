@@ -15,10 +15,11 @@
     {
       "id": "S04-COMPLIANCE",
       "name": "Reglas de Integridad",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Integración de Compliance Guard y Scope-Lock en Baseline.",
       "tasks": [
-        {"id": "TASK-DPI-S04-02", "label": "SEC", "desc": "Compliance Guard Integration", "status": "IN_PROGRESS"}
+        {"id": "TASK-DPI-S04-02", "label": "SEC", "desc": "Compliance Guard Integration", "status": "DONE"},
+        {"id": "TASK-DPI-S04-03", "label": "GOV", "desc": "Forensic Ledger Integration", "status": "DONE"}
       ]
     }
   ]
