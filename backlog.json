@@ -25,7 +25,7 @@
     {
       "id": "S101-GOV",
       "name": "Hardening Auditivo y de Estado",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "goal": "Consolidación de Auditoría, Alertas y Reconciliación del Kernel.",
       "tasks": [
         {"id": "TASK-DPI-S101-01", "label": "GOV", "desc": "Atomic State Reconciliation", "status": "PENDING"}
