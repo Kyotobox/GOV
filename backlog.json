@@ -21,6 +21,15 @@
         {"id": "TASK-DPI-S04-02", "label": "SEC", "desc": "Compliance Guard Integration", "status": "DONE"},
         {"id": "TASK-DPI-S04-03", "label": "GOV", "desc": "Forensic Ledger Integration", "status": "DONE"}
       ]
+    },
+    {
+      "id": "S101-GOV",
+      "name": "Hardening Auditivo y de Estado",
+      "status": "PENDING",
+      "goal": "Consolidación de Auditoría, Alertas y Reconciliación del Kernel.",
+      "tasks": [
+        {"id": "TASK-DPI-S101-01", "label": "GOV", "desc": "Atomic State Reconciliation", "status": "PENDING"}
+      ]
     }
   ]
 }
