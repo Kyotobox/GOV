@@ -312,6 +312,32 @@
           "status": "DONE"
         }
       ]
+    },
+    {
+      "id": "S20-PROD",
+      "name": "Ejecución de Pase a Producción (BASE2)",
+      "status": "DONE",
+      "goal": "Deprecación legacy, endurecimiento FORTRESS y sellado de kernel de producción.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S20-01",
+          "label": "OPS",
+          "desc": "Deprecación Legacy (PS1/OPS deletion)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S20-02",
+          "label": "SEC",
+          "desc": "Auditoría y Sellado Atómico (100% Test Pass)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S20-03",
+          "label": "GOV",
+          "desc": "Cierre y Relevo Prod (Handover Sealed)",
+          "status": "DONE"
+        }
+      ]
     }
   ]
 }

@@ -5,7 +5,6 @@ import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
 import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
 import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
-import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/core/pack_engine.dart';
@@ -77,6 +76,7 @@ void main(List<String> arguments) async {
       ..addCommand('status'))
     ..addCommand('pack')
     ..addCommand('report')
+    ..addCommand('detectOrphans')
     ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
     ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
 
@@ -128,6 +128,9 @@ void main(List<String> arguments) async {
       break;
     case 'report':
       await runReport(basePath);
+      break;
+    case 'detectOrphans':
+      await runDetectOrphans(basePath);
       break;
     case 'vault':
       await runVault(basePath, results.command!);
@@ -371,7 +374,6 @@ Future<void> runHandover(String basePath, String? keyPath, {bool force = false})
   final backlogManager = BacklogManager();
   final telemetry = TelemetryService();
   final vanguard = VanguardCore();
-  final dashboard = DashboardEngine();
 
   if (force) {
     print('[WARNING] FORCE-HANDOVER: Ignorando validaciones de integridad por orden superior.');
@@ -766,5 +768,20 @@ Future<void> runPack(String basePath) async {
   } catch (e, stack) {
     print('[CRITICAL] Error en pack: $e');
     print(stack);
+  }
+}
+
+Future<void> runDetectOrphans(String basePath) async {
+  print('--- [AUDIT] DETECCIÓN DE HUÉRFANOS ---');
+  final integrity = IntegrityEngine();
+  final orphans = await integrity.detectOrphans(basePath: basePath);
+  
+  if (orphans.isEmpty) {
+    print('[✅] No se detectaron archivos huérfanos.');
+  } else {
+    print('[‼️] Archivos huérfanos detectados:');
+    for (var o in orphans) {
+      print('  - $o');
+    }
   }
 }

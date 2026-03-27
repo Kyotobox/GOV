@@ -62,7 +62,7 @@ void main() {
         final prevHash = sha256.convert(utf8.encode(prevLine)).toString();
         // The current line's 4th column (index 3 in split('|')) should be prevHash
         final parts = currLine.split('|');
-        final recordedPrevHash = parts[3].trim();
+        final recordedPrevHash = parts[4].trim();
         
         expect(recordedPrevHash, equals(prevHash), reason: 'Chain broken at line $i');
     }
