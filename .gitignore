@@ -3,4 +3,6 @@
 .dart_tool/
 vault/intel/
 build/
-*.exe
+session.lock
+gov.exe
+gov_oracle.exe
