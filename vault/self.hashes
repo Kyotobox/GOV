@@ -1,5 +1,5 @@
 {
-  "bin/antigravity_dpi.dart": "4e6891e2e022657872cef2a52538382f92dad5336d0d9761cf8b7f89a7424c8c",
+  "bin/antigravity_dpi.dart": "9dd5d6fab9daebfcc846269781e07300767904ee4d5587c883bacca48c1c0e28",
   "lib/antigravity_dpi.dart": "861fc071323d72f1dfbe873790668cb18c0f797d79636ad89035b04e98bc057f",
   "lib/src/core/cache_layer.dart": "7405477e55b65e48858bfb2e303b735344d33de8b728aefff2abf72e5652e0d5",
   "lib/src/core/context_engine.dart": "2b976307c3a7f40d612b25abec1cc987d56e56db460938367097218499daf7e5",
@@ -11,8 +11,9 @@
   "lib/src/core/test_engine.dart": "cc4abfa0b803832769b64c6d532561ec3db819dce7d3cc0af8ae1ab22a6c1088",
   "lib/src/dash/dashboard_engine.dart": "94a0386112d24722004d4ea9f7a41bd99b906c904dd0416b6ac5c49a7334e3b1",
   "lib/src/security/integrity_engine.dart": "04940ba89bd92e553e62d8e1dc04ee132cdb3144d5387db517b65d39f1988a99",
-  "lib/src/security/sign_engine.dart": "c3bedaac5b3c92e23d56b762555df4312acad89fcc4a5abacbf9680dd93a9c6e",
-  "lib/src/security/vanguard_core.dart": "09c5248f3266b4ea78546405004a416bd4a6aac40e741c8f0200a689a1bcb08f",
+  "lib/src/security/key_generator.dart": "9a64b3312c62259427abdc6a07075bec4baf589a2859d225a1b0c8882a6c8cc3",
+  "lib/src/security/sign_engine.dart": "20b67805886609b0ae3941446bde2f3af6be6d72fc0d5a23e110c5ba189636af",
+  "lib/src/security/vanguard_core.dart": "cd69090ea92351f9abb7d35d7338096e5d55d04e0ccd8b935b1dc3a81c847ec6",
   "lib/src/security/vanguard_watcher.dart": "9820d426b9f5b51439de8515fde2eeeb845911a0bd9b01b6dfeaf5062dd103dc",
   "lib/src/tasks/backlog_manager.dart": "5623443949ce76084b8fcea0b57cbd35903368b9a8f2619a4ba46c6691f54a42",
   "lib/src/tasks/compliance_guard.dart": "34538ee8ffc11a1e4cf81c1506e0defb96473113c97baed61aa6875b865d09f5",

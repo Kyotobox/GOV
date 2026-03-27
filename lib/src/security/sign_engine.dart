@@ -100,6 +100,12 @@ class SignEngine {
     // Ensure critical components exist
     if (!params.containsKey('Modulus')) throw Exception('Clave RSA inválida: Falta Modulus');
     
+    // S19-FORTRESS: Enforce 2048-bit minimum bit-depth (VUL-PRO-01)
+    final modulus = params['Modulus']!;
+    if (modulus.length < 256) {
+      throw Exception('DEBILIDAD DETECTADA: La clave RSA es inferior a 2048 bits (${modulus.length * 8} bits). El sistema requiere grado de seguridad FORTRESS.');
+    }
+
     return params;
   }
 

@@ -11,9 +11,9 @@ import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/core/pack_engine.dart';
 import 'package:antigravity_dpi/src/core/context_engine.dart';
 import 'package:antigravity_dpi/src/core/hook_engine.dart';
-import 'package:antigravity_dpi/src/core/test_engine.dart';
 import 'package:antigravity_dpi/src/core/reconstitution_engine.dart';
 import 'package:antigravity_dpi/src/core/report_engine.dart';
+import 'package:antigravity_dpi/src/security/key_generator.dart';
 import 'package:path/path.dart' as p;
 
 const String version = '1.0.0';
@@ -72,6 +72,7 @@ void main(List<String> arguments) async {
       ..addCommand('bind-key', ArgParser()
         ..addOption('project', abbr: 'p', help: 'Project ID')
         ..addOption('key', abbr: 'k', help: 'Path to RSA XML Key'))
+      ..addCommand('rotate-keys')
       ..addCommand('status'))
     ..addCommand('pack')
     ..addCommand('report')
@@ -380,7 +381,17 @@ Future<void> runHandover(String basePath, String? keyPath, {bool force = false})
     basePath: basePath,
   );
 
-  final signed = await vanguard.waitForSignature(basePath: basePath);
+  final challengeId = await vanguard.issueChallenge(
+    level: 'TACTICAL',
+    project: backlog['project'] ?? 'UNKNOWN',
+    files: ['session.lock', 'intel_pulse.json'],
+    basePath: basePath,
+  );
+
+  final signed = await vanguard.waitForSignature(
+    basePath: basePath,
+    challenge: challengeId,
+  );
   if (!signed) {
     print('[CRITICAL] Handover abortado: Se requiere firma del PO.');
     return;
@@ -523,6 +534,34 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   }
 
   print('DEBUG-BASELINE: Audit complete. Resolving key...');
+  // 1. PO APPROVAL CHALLENGE (VUL-NEW: Mandatory HITL for Strategic Seals)
+  final poPublicKeyXml = await _resolvePublicKey(basePath);
+  if (poPublicKeyXml == null) {
+    print('[CRITICAL] No se encontró clave pública del PO para este proyecto.');
+    return;
+  }
+
+  final challengeId = await vanguard.issueChallenge(
+    level: 'STRATEGIC-GOLD',
+    project: activeSprint['id'],
+    files: ['kernel.hashes', 'lib/', 'bin/'],
+    basePath: basePath,
+    description: 'SOLICITUD DE SELLADO FORMAL (BASELINE): Verificando integridad de kernel.',
+  );
+
+  final isApproved = await vanguard.waitForSignature(
+    basePath: basePath,
+    challenge: challengeId,
+    publicKeyXml: poPublicKeyXml,
+    timeoutSeconds: 60, // Sello estratégico requiere tiempo de reflexión
+  );
+
+  if (!isApproved) {
+    print('[CRITICAL] Baseline abortado: No se recibió firma RSA válida del PO.');
+    return;
+  }
+  print('  [✅] PO-APPROVAL: Firma RSA verificada.');
+
   // Resolve key from vault if not provided (VUL-02)
   final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, activeSprint['id']);
   print('DEBUG-BASELINE: Resolved Key Path: $resolvedKeyPath');
@@ -630,6 +669,27 @@ Future<void> runVault(String basePath, ArgResults command) async {
     case 'status':
       print('--- [VAULT] CLAVES VINCULADAS ---');
       keys.forEach((id, path) => print('  $id -> $path'));
+      break;
+    case 'rotate-keys':
+      print('--- [VAULT] ROTACIÓN DE CLAVES (RSA-2048) ---');
+      final gen = KeyGenerator();
+      final newKeys = gen.generate2048();
+      
+      final privPath = p.join(basePath, 'vault', 'po_private.xml');
+      final pubPath = p.join(basePath, 'vault', 'po_public.xml');
+      
+      // Backup old keys
+      if (File(privPath).existsSync()) {
+        await File(privPath).copy('$privPath.bak');
+        print('  [INFO] Backup de clave privada creado.');
+      }
+      
+      await File(privPath).writeAsString(newKeys['private']!);
+      await File(pubPath).writeAsString(newKeys['public']!);
+      
+      print('[✅] Claves RE-GENERADAS (2048-bit) y persistidas en el Vault.');
+      print('      Privada: $privPath');
+      print('      Pública: $pubPath');
       break;
     default:
       print('[ERROR] Subcomando de vault no reconocido: ${subCommand.name}');

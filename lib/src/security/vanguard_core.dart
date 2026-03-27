@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
+import 'sign_engine.dart';
 
 class VanguardCore {
   /// Generates a new challenge and writes it to vault/intel/challenge.json.
@@ -39,28 +40,35 @@ class VanguardCore {
     return challengeId;
   }
 
-  /// Watches for signature.json in vault/intel/ using a reactive watcher.
-  Future<bool> waitForSignature({required String basePath, int timeoutSeconds = 30}) async {
-    final sigPath = p.normalize(p.join(basePath, 'vault', 'intel', 'signature.json'));
+  /// Watches for signature.json in vault/intel/ using a reactive watcher and verifies RSA.
+  Future<bool> waitForSignature({
+    required String basePath, 
+    required String challenge,
+    String? publicKeyXml,
+    int timeoutSeconds = 30
+  }) async {
+    final sigPath = p.canonicalize(p.join(basePath, 'vault', 'intel', 'signature.json'));
     final intelDir = p.join(basePath, 'vault', 'intel');
     final sigFile = File(sigPath);
     
-    print('[VANGUARD] Esperando firma del PO (REACTIVO-RESILIENTE, timeout: ${timeoutSeconds}s)...');
+    print('[VANGUARD] Esperando firma RSA del PO (Desafío: ${challenge.substring(0, 8)}...)...');
     
     final completer = Completer<bool>();
     final watcher = DirectoryWatcher(intelDir);
     
-    final subscription = watcher.events.listen((event) {
-      final eventPath = p.normalize(event.path);
-      if (eventPath == sigPath && 
-          (event.type == ChangeType.ADD || event.type == ChangeType.MODIFY)) {
-        if (!completer.isCompleted) completer.complete(true);
+    final subscription = watcher.events.listen((event) async {
+      final eventPath = p.canonicalize(p.join(intelDir, event.path));
+      if (eventPath.toLowerCase() == sigPath.toLowerCase() && (event.type == ChangeType.ADD || event.type == ChangeType.MODIFY)) {
+        if (!completer.isCompleted) {
+          final ok = await _verifySig(sigFile, challenge, publicKeyXml);
+          if (ok) completer.complete(true);
+        }
       }
     });
 
-    // Check if it already exists slightly AFTER starting the watcher to bridge the gap
     if (await sigFile.exists()) {
-      if (!completer.isCompleted) completer.complete(true);
+      final ok = await _verifySig(sigFile, challenge, publicKeyXml);
+      if (ok && !completer.isCompleted) completer.complete(true);
     }
 
     try {
@@ -68,14 +76,43 @@ class VanguardCore {
         Duration(seconds: timeoutSeconds),
         onTimeout: () => false,
       );
-      if (result) print('[VANGUARD] Firma DETECTADA ✅ (Evento)');
       return result;
-    } catch (e) {
-      print('[VANGUARD] Error en el watcher: $e');
-      return false;
     } finally {
       await subscription.cancel();
+      // VUL-25: Eliminar firma tras uso para evitar re-uso (Replay Protection)
+      if (sigFile.existsSync()) await sigFile.delete();
     }
+  }
+
+  Future<bool> _verifySig(File sigFile, String challenge, String? publicKeyXml) async {
+    for (int i = 0; i < 3; i++) {
+        try {
+          final content = await sigFile.readAsString();
+          if (content.isEmpty) {
+              await Future.delayed(Duration(milliseconds: 100));
+              continue;
+          }
+          final data = jsonDecode(content);
+          if (data['challenge'] != challenge) return false;
+          
+          final signatureB64 = data['signature'];
+          if (signatureB64 == null) return false;
+
+          // Si no hay llave pública (Tactical/Manual), aprobamos por presencia.
+          // Si hay llave pública (Strategic/Baseline), VERIFICAMOS RSA.
+          if (publicKeyXml == null) return true;
+
+          final signEngine = SignEngine();
+          return await signEngine.verify(
+            challenge: utf8.encode(challenge),
+            signature: base64Decode(signatureB64),
+            publicKeyXml: publicKeyXml,
+          );
+        } catch (_) {
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+    }
+    return false;
   }
 
   /// [PILLAR 1] GATE-BLACK Escalation

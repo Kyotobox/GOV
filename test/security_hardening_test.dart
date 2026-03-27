@@ -24,19 +24,16 @@ void main() {
     late SignEngine engine;
     final privateKeyXml = '''
 <RSAKeyValue>
-  <Modulus>mS1R6...==</Modulus>
+  <Modulus>m51mIDde/ckTyiJrrT63a3Nz5skRKO3iY8TQExQwwgzoQwpnutVeKbkVCvwIHhOvt/BEHAIx/pVVD1jCemDNxQ==</Modulus>
   <Exponent>AQAB</Exponent>
-  <P>7u...</P>
-  <Q>4v...</Q>
-  <DP>...</DP>
-  <DQ>...</DQ>
-  <InverseQ>...</InverseQ>
-  <D>dK...</D>
+  <D>MD+9Sn/glA+kcyf4+t5XQJmrdgMhru8TIpwDZ+b6ty+MV+LpyPxWBWzQg2cFImbEjZDWbt1wpJjXzLmVxhDkAQ==</D>
+  <P>5ZU1tJewnnCSTE26rPxBJDtqapJZ6IiEBS9Wq/GL/Kk=</P>
+  <Q>rYVS3VFtu0Qzz8qqeHF/AVpjiBrxqpg3QONq4B0bPb0=</Q>
 </RSAKeyValue>''';
 
     final publicKeyXml = '''
 <RSAKeyValue>
-  <Modulus>mS1R6...==</Modulus>
+  <Modulus>m51mIDde/ckTyiJrrT63a3Nz5skRKO3iY8TQExQwwgzoQwpnutVeKbkVCvwIHhOvt/BEHAIx/pVVD1jCemDNxQ==</Modulus>
   <Exponent>AQAB</Exponent>
 </RSAKeyValue>''';
 
@@ -90,12 +87,13 @@ void main() {
       // Iniciamos la espera en un Future
       final waitFuture = vanguardCore.waitForSignature(
         basePath: tempDir.path, 
+        challenge: 'TEST-CHALLENGE',
         timeoutSeconds: 5
       );
 
       // Simulamos que el PO firma después de 500ms
       await Future.delayed(Duration(milliseconds: 500));
-      await sigFile.writeAsString('{"signature": "test-sig"}');
+      await sigFile.writeAsString('{"challenge": "TEST-CHALLENGE", "signature": "test-sig"}');
 
       final result = await waitFuture;
       expect(result, isTrue, reason: 'El watcher debería haber detectado la creación del archivo');
@@ -107,6 +105,7 @@ void main() {
 
       final result = await vanguardCore.waitForSignature(
         basePath: tempDir.path, 
+        challenge: 'NO-CHALLENGE',
         timeoutSeconds: 1
       );
 
