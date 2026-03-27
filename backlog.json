@@ -198,7 +198,7 @@
     {
       "id": "S15-SYMBIOSIS",
       "name": "Generador de Contexto",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Implementar 'gov context' para focalización de la IA.",
       "tasks": [
         {
@@ -224,14 +224,14 @@
     {
       "id": "S16-FACTORY-OPS",
       "name": "Automatización de Operaciones",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "goal": "Auto-Commit semántico y trazabilidad total.",
       "tasks": [
         {
           "id": "TASK-DPI-S16-01",
           "label": "OPS",
           "desc": "Auto-Commit Semántico y Estandarizado",
-          "status": "PENDING"
+          "status": "IN_PROGRESS"
         },
         {
           "id": "TASK-DPI-S16-02",
