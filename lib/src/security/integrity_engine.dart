@@ -21,38 +21,33 @@ class IntegrityEngine {
     String expectedPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
     
     for (int i = 2; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) continue;
+      final rawLine = lines[i];
+      if (rawLine.trim().isEmpty) continue;
 
-      final parts = line.split('|');
-      if (parts.length < 9) continue; // Not a valid entry line
+      final parts = rawLine.split('|');
+      // [REPORT-FIX]: Robust length check. Standard format has 8 pipes (9 parts).
+      if (parts.length < 8) continue; 
 
+      // [REPORT-FIX]: Column 4 is PrevHash in 7-column format (| t | r | s | p | t | t | d |)
+      // but if parts[0] is empty, parts[4] is the 4th gap.
+      // Let's find common index by searching for a 64-char hex string if possible?
+      // No, let's be deterministic. In our format, PrevHash is index 4.
       final actualPrevHash = parts[4].trim();
+      
       if (actualPrevHash != expectedPrevHash) {
-        print('[FORENSIC-FAIL] Ruptura de cadena en línea ${i+1}.');
+        print('[FORENSIC-FAIL] Ruptura de cadena en línea ${i + 1}.');
         print('                Esperado: $expectedPrevHash');
         print('                Encontrado: $actualPrevHash');
         return false;
       }
       
-      // Update expectedPrevHash for the NEXT line
-      expectedPrevHash = sha256.convert(utf8.encode(line)).toString();
+      // Update expectedPrevHash for the NEXT line. 
+      // VUL-INTEGRITY: Hash the RAW line to avoid trim-based false positives.
+      expectedPrevHash = sha256.convert(utf8.encode(rawLine)).toString();
     }
     
-    // VUL-11: Verify against the Ledger Anchor in session.lock if it exists
-    final lockFile = File(p.join(basePath, 'session.lock'));
-    if (await lockFile.exists()) {
-      try {
-        final lockData = jsonDecode(await lockFile.readAsString());
-        final anchor = lockData['ledger_tip_hash'];
-        if (anchor != null && anchor != expectedPrevHash) {
-          print('[FORENSIC-FAIL] El ancla del Ledger en session.lock no coincide con el estado actual.');
-          return false;
-        }
-      } catch (_) {}
-    }
-
-    return true;
+    // [REPORT-FIX]: Consolidate with verifyLedgerAnchor to ensure HMAC and DRY.
+    return await verifyLedgerAnchor(basePath: basePath, currentTipHash: expectedPrevHash);
   }
 
   /// SSSoT: Verifies the tool itself against vault/self.hashes (VUL-01).
@@ -234,34 +229,41 @@ class IntegrityEngine {
   }
 
   /// S13-01: Verifies the ledger anchor against HISTORY.md (VUL-11).
-  Future<bool> verifyLedgerAnchor({required String basePath}) async {
+  Future<bool> verifyLedgerAnchor({required String basePath, String? currentTipHash}) async {
     final lockFile = File(p.join(basePath, 'session.lock'));
     if (!await lockFile.exists()) return true; // No session, nothing to anchor
 
-    final lockData = jsonDecode(await lockFile.readAsString());
+    final Map<String, dynamic> lockData = jsonDecode(await lockFile.readAsString());
+    
+    // [REPORT-FIX]: Mandatory HMAC verification (VUL-16)
     if (!verifySessionMAC(lockData)) {
-      print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido (VUL-11).');
+      print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o manipulado.');
       return false;
     }
 
     final String? anchoredHash = lockData['ledger_tip_hash'];
     if (anchoredHash == null) return true; // Not anchored yet
 
-    final historyFile = File(p.join(basePath, 'HISTORY.md'));
-    if (!await historyFile.exists()) return false;
+    String actualHash = '';
+    if (currentTipHash != null) {
+      actualHash = currentTipHash;
+    } else {
+      final historyFile = File(p.join(basePath, 'HISTORY.md'));
+      if (!await historyFile.exists()) return false;
 
-    final lines = await historyFile.readAsLines();
-    if (lines.isEmpty) return false;
+      final lines = await historyFile.readAsLines();
+      if (lines.isEmpty) return false;
 
-    final lastLine = lines.lastWhere((l) => l.startsWith('|'), orElse: () => '');
-    if (lastLine.isEmpty) return false;
+      final lastLine = lines.lastWhere((l) => l.trim().startsWith('|'), orElse: () => '');
+      if (lastLine.isEmpty) return false;
 
-    final actualHash = sha256.convert(utf8.encode(lastLine)).toString();
+      actualHash = sha256.convert(utf8.encode(lastLine)).toString();
+    }
     
     if (actualHash != anchoredHash) {
       print('[CRITICAL] LEDGER-CORRUPTION: El hash del historial no coincide con el ancla en session.lock.');
-      print('  Esperado: $anchoredHash');
-      print('  Actual:   $actualHash');
+      print('  Esperado (Ancla): $anchoredHash');
+      print('  Actual (Ledger):  $actualHash');
       return false;
     }
 
