@@ -290,7 +290,7 @@ class IntegrityEngine {
       'GEMINI.md', 'VISION.md', 'METHODOLOGY.md', 'PROJECT_LOG.md', 
       'task.md', 'backlog.json', 'DASHBOARD.md', 'README.md', 
       '.gitignore', 'pubspec.yaml', 'pubspec.lock', 'analysis_options.yaml',
-      'session.lock'
+      'session.lock', 'HISTORY.md'
     };
     final root = Directory(basePath).listSync().whereType<File>();
     final zombies = <String>[];
