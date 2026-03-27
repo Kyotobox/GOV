@@ -3,7 +3,12 @@
 > [!IMPORTANT]
 > **PRE-REQUISITOS**: S19-FORTRESS (verificación de cadena y tests unitarios) está 100% completado, validado y fusionado en el kernel actual.
 
-## FASE 1: Auditoría y Validación Atómica
+## FASE 0: Deprecación del Esquema Legacy (PS/OPS)
+1. **Limpieza de Scripts de Validación**: Identificar y eliminar todos los scripts de PowerShell (`.ps1`) y archivos de configuración `.ops` que gobernaban el esquema de validación anterior.
+2. **Actualización de Entrypoints**: Modificar cualquier pipeline, archivo batch o acceso directo externo para que apunte exclusivamente al nuevo motor CLI (`dart bin/antigravity_dpi.dart` o su binario compilado).
+3. **Validación de Ausencia Legacy**: Asegurar que ningún archivo `.ops` residual quede en el árbol de directorios protegido por el `GATE-GOLD`.
+
+## FASE 1: Auditoría y Sellado Atómico
 1. **Determinismo Unitario (Self-Audit)**: Ejecutar toda la suite de pruebas unitarias (`dart test test/`). Se debe garantizar que el 100% de las pruebas, especialmente las relativas al motor de integridad y criptografía (`verifyChain`, `verifyManifest`), pasen sin incidentes.
 2. **Limpieza de Huérfanos**: Ejecutar el motor de integridad (`detectOrphans`) para rastrear y eliminar cualquier archivo residual o temporal en `bin/` o `lib/` que no deba pasar a producción.
 

@@ -28,7 +28,7 @@ void main() async {
         'challenge': challenge,
         'signature': base64Encode(signatureBytes),
         'timestamp': DateTime.now().toIso8601String(),
-        'po': 'SEC-PO-S19',
+        'po': 'SEC-PO-S19-GOLD',
       };
       await File('vault/intel/signature.json').writeAsString(jsonEncode(signaturePayload));
     }

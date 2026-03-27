@@ -109,5 +109,21 @@ void main() {
       final result = await engine.verifyChain(basePath: basePath);
       expect(result, isFalse, reason: 'Should fail if session.lock MAC is invalid');
     });
+    test('Dynamic Column Detection (Custom Order)', () async {
+      final historyFile = File(p.join(basePath, 'HISTORY.md'));
+      // PrevHash is now at index 3 (No leading pipe empty string counting)
+      // Wait. If header is | A | PrevHash | B |
+      // HeaderParts: ['', 'A', 'PrevHash', 'B', ''] (index 2)
+      final header = '| SessionID | PrevHash | Task |';
+      
+      final line1 = '| S1 | 0000000000000000000000000000000000000000000000000000000000000000 | T1 |';
+      final h1 = sha256.convert(utf8.encode(line1)).toString();
+      final line2 = '| S1 | $h1 | T2 |';
+      
+      await historyFile.writeAsString('$header\n|---|---|---|\n$line1\n$line2\n');
+      
+      final result = await engine.verifyChain(basePath: basePath);
+      expect(result, isTrue, reason: 'Should dynamically find PrevHash regardless of position');
+    });
   });
 }

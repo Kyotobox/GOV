@@ -17,7 +17,15 @@ class IntegrityEngine {
     final lines = await historyFile.readAsLines();
     if (lines.length < 3) return true; // Just header or empty
 
-    // Skip first 2 lines (header and separator)
+    // [REPORT-FIX]: Determinar dinámicamente el índice de la columna PrevHash (VUL-11/12)
+    final headerParts = lines[0].split('|').map((e) => e.trim()).toList();
+    int prevHashIndex = headerParts.indexOf('PrevHash');
+    
+    if (prevHashIndex == -1) {
+      print('[FORENSIC-FAIL] No se encontró la columna "PrevHash" en HISTORY.md.');
+      return false;
+    }
+
     String expectedPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
     
     for (int i = 2; i < lines.length; i++) {
@@ -25,14 +33,9 @@ class IntegrityEngine {
       if (rawLine.trim().isEmpty) continue;
 
       final parts = rawLine.split('|');
-      // [REPORT-FIX]: Robust length check. Standard format has 8 pipes (9 parts).
-      if (parts.length < 8) continue; 
+      if (parts.length <= prevHashIndex) continue;
 
-      // [REPORT-FIX]: Column 4 is PrevHash in 7-column format (| t | r | s | p | t | t | d |)
-      // but if parts[0] is empty, parts[4] is the 4th gap.
-      // Let's find common index by searching for a 64-char hex string if possible?
-      // No, let's be deterministic. In our format, PrevHash is index 4.
-      final actualPrevHash = parts[4].trim();
+      final actualPrevHash = parts[prevHashIndex].trim();
       
       if (actualPrevHash != expectedPrevHash) {
         print('[FORENSIC-FAIL] Ruptura de cadena en línea ${i + 1}.');
@@ -41,8 +44,6 @@ class IntegrityEngine {
         return false;
       }
       
-      // Update expectedPrevHash for the NEXT line. 
-      // VUL-INTEGRITY: Hash the RAW line to avoid trim-based false positives.
       expectedPrevHash = sha256.convert(utf8.encode(rawLine)).toString();
     }
     
