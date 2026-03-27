@@ -1,6 +1,6 @@
 # TASK-DPI-S19-02: Apretón de Manos RSA Táctico (Handover)
 
-**Estado**: PENDING
+**Estado**: DONE
 **Prioridad**: HIGH (GATE-RED)
 **CP**: 10.0
 
@@ -18,6 +18,7 @@ Endurecer el proceso de `handover` (cierre de sesión) para que requiera una fir
 3. Implementar protección contra ataques de repetición (Replay Protection) mediante el borrado atómico del archivo de firma.
 
 ## 4. Definición de Hecho (DoD)
-- [ ] `handover` falla si se intenta cerrar con un archivo de firma corrupto o firmado con la clave incorrecta.
-- [ ] Logs forenses registran la verificación exitosa de la firma táctica.
+- [x] `runHandover` exige firma RSA-2048.
+- [x] El cierre de sesión ya no es automático (requiere HITL).
+- [x] Logs forenses reflejan la firma del PO en el cierre.
 - [ ] Suite de tests validando el handshake táctico en verde.

@@ -1,6 +1,6 @@
 # TASK-DPI-S19-01: Rotación de Claves a RSA-2048
 
-**Estado**: PENDING
+**Estado**: DONE
 **Prioridad**: CRITICAL (GATE-GOLD)
 **CP**: 15.0
 
@@ -15,8 +15,9 @@ Elevar la muralla criptográfica del sistema mediante la generación de un nuevo
 
 ## 3. Requerimientos Operativos
 1. Generar nuevo par de claves RSA-2048.
-2. Actualizar el Vault con las nuevas claves.
-3. El sistema debe invalidar el `baseline` anterior y forzar un re-sellado con la nueva clave.
+- [x] Vault actualizado con nuevas llaves de 2048 bits.
+- [x] `SignEngine` rechaza activamente cualquier clave inferior.
+- [x] Baseline regenerado exitosamente tras rotación.
 4. Notificar violación de integridad si se detectan firmas antiguas (512-bit) tras la migración.
 
 ## 4. Definición de Hecho (DoD)

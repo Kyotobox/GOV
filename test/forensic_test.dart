@@ -75,7 +75,6 @@ void main() {
       final historyFile = File(p.join(basePath, 'HISTORY.md'));
       final header = '| T | R | S | P | T | T | D |\n|---|---|---|---|---|---|---|';
       final line1 = '| 2026-03-27 | AI | S1 | 0000000000000000000000000000000000000000000000000000000000000000 | BASE | T1 | D1 |';
-      final h1 = sha256.convert(utf8.encode(line1)).toString();
       await historyFile.writeAsString('$header\n$line1\n');
 
       // Create valid session.lock but with WRONG tip hash

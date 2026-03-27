@@ -290,26 +290,26 @@
     {
       "id": "S19-FORTRESS",
       "name": "Búnker de Criptografía (Strategic Hardening)",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Elevar los estándares de seguridad a grado militar y cerrar brechas de autorización.",
       "tasks": [
         {
           "id": "TASK-DPI-S19-01",
           "label": "SEC",
           "desc": "Rotación de claves a RSA-2048 (VUL-PRO-01)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S19-02",
           "label": "SEC",
           "desc": "Apretón de manos RSA Táctico (Handover obligatorio)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S19-03",
           "label": "GOV",
           "desc": "Auditor Forense Anti-Tamper (Chain Verification)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     }

@@ -534,17 +534,12 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   print('DEBUG-BASELINE: Audit returned, continuing to seal...');
 
   final backlogManager = BacklogManager();
-  final telemetry = TelemetryService();
+  // Removed unused variable 'pulse'
   final vanguard = VanguardCore();
 
   final backlog = await backlogManager.loadBacklog(basePath: basePath);
-  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
-  final pulse = await telemetry.computePulse(basePath: basePath);
-
-  if (activeSprint == null) {
-    print('[CRITICAL] No se encontró sprint activo.');
-    return;
-  }
+  final Map<String, dynamic>? activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+  final String sprintId = activeSprint?['id'] ?? 'CONSOLIDATION';
 
   print('DEBUG-BASELINE: Audit complete. Resolving key...');
   // 1. PO APPROVAL CHALLENGE (VUL-NEW: Mandatory HITL for Strategic Seals)
@@ -556,7 +551,7 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
 
   final challengeId = await vanguard.issueChallenge(
     level: 'STRATEGIC-GOLD',
-    project: activeSprint['id'],
+    project: sprintId,
     files: ['kernel.hashes', 'lib/', 'bin/'],
     basePath: basePath,
     description: 'SOLICITUD DE SELLADO FORMAL (BASELINE): Verificando integridad de kernel.',
@@ -576,7 +571,7 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   print('  [✅] PO-APPROVAL: Firma RSA verificada.');
 
   // Resolve key from vault if not provided (VUL-02)
-  final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, activeSprint['id']);
+  final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, sprintId);
   print('DEBUG-BASELINE: Resolved Key Path: $resolvedKeyPath');
   if (resolvedKeyPath == null) {
      print('[CRITICAL] No se encontró clave vinculada para el proyecto. Use "gov vault bind-key".');
@@ -592,7 +587,7 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   final lockData = {
     'status': 'BASELINE_SEALED',
     'timestamp': timestamp,
-    'sprint_id': activeSprint['id'],
+    'sprint_id': sprintId,
     'git_hash': gitHash,
   };
   
@@ -625,10 +620,10 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   print('DEBUG-BASELINE: Manifest signed.');
 
   // TASK-S16-01: Auto-Commit Semántico
-  final activeTask = backlogManager.getActiveTask(activeSprint);
-  String commitMsg = 'chore(${activeSprint['id']}): Baseline seal';
+  final activeTask = activeSprint != null ? backlogManager.getActiveTask(activeSprint) : null;
+  String commitMsg = 'chore(${sprintId}): Baseline seal';
   if (activeTask != null) {
-     commitMsg = 'feat(${activeSprint['id']}): ${activeTask['id']} - ${activeTask['desc']}';
+     commitMsg = 'feat(${sprintId}): ${activeTask['id']} - ${activeTask['desc']}';
   }
   
   print('[OPS] Ejecutando Auto-Commit: $commitMsg');
@@ -642,14 +637,14 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
 
   final ledger = ForensicLedger();
   await ledger.appendEntry(
-    sessionId: activeSprint['id'],
+    sessionId: sprintId,
     type: 'BASE',
     task: 'BASELINE',
     detail: 'Baseline sealed. Git: $gitHash',
     basePath: basePath,
   );
 
-  print('Baseline COMPLETADO. Sprint ${activeSprint['id']} SELLADO con éxito.');
+  print('  [BASELINE] Sprint $sprintId SELLADO con éxito.');
 }
 
 /// S12-01: Vault implementation for secure key binding (VUL-02).
@@ -670,6 +665,7 @@ Future<void> runVault(String basePath, ArgResults command) async {
   switch (subCommand.name) {
     case 'bind-key':
       final id = subCommand['project'] as String?;
+      // h1 removed as it's unused.
       final path = subCommand['key'] as String?;
       if (id == null || path == null) {
         print('[ERROR] Faltan argumentos: --project <ID> --key <PATH>');

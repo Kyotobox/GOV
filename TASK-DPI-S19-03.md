@@ -1,6 +1,6 @@
 # TASK-DPI-S19-03: Auditor Forense Anti-Tamper (Chain Verification)
 
-**Estado**: PENDING
+**Estado**: DONE
 **Prioridad**: MEDIUM (GATE-RED)
 **CP**: 12.0
 
@@ -19,6 +19,6 @@ Implementar un motor de verificación de cadena de bloques para `HISTORY.md`. Ca
 4. Impedir `takeover` si la cadena forense está rota.
 
 ## 4. Definición de Hecho (DoD)
-- [ ] Comando `gov audit --deep` implementado y funcional.
-- [ ] El sistema detecta si se borra una sola línea del `HISTORY.md` antiguo.
-- [ ] Protección contra "Time-Travel Attacks" (alteración de timestamps pasados).
+- [x] Comando `gov audit --deep` implementado y funcional.
+- [x] El sistema detecta si se borra una sola línea del `HISTORY.md` antiguo.
+- [x] Protección contra "Time-Travel Attacks" (alteración de timestamps pasados).
