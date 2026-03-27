@@ -9,6 +9,52 @@ import 'sign_engine.dart';
 class IntegrityEngine {
   final SignEngine _signer = SignEngine();
 
+  /// S19-FORTRESS: Verifies the cryptographic chain of HISTORY.md (VUL-11/12).
+  Future<bool> verifyChain({required String basePath}) async {
+    final historyFile = File(p.join(basePath, 'HISTORY.md'));
+    if (!await historyFile.exists()) return true;
+
+    final lines = await historyFile.readAsLines();
+    if (lines.length < 3) return true; // Just header or empty
+
+    // Skip first 2 lines (header and separator)
+    String expectedPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
+    
+    for (int i = 2; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      final parts = line.split('|');
+      if (parts.length < 9) continue; // Not a valid entry line
+
+      final actualPrevHash = parts[4].trim();
+      if (actualPrevHash != expectedPrevHash) {
+        print('[FORENSIC-FAIL] Ruptura de cadena en línea ${i+1}.');
+        print('                Esperado: $expectedPrevHash');
+        print('                Encontrado: $actualPrevHash');
+        return false;
+      }
+      
+      // Update expectedPrevHash for the NEXT line
+      expectedPrevHash = sha256.convert(utf8.encode(line)).toString();
+    }
+    
+    // VUL-11: Verify against the Ledger Anchor in session.lock if it exists
+    final lockFile = File(p.join(basePath, 'session.lock'));
+    if (await lockFile.exists()) {
+      try {
+        final lockData = jsonDecode(await lockFile.readAsString());
+        final anchor = lockData['ledger_tip_hash'];
+        if (anchor != null && anchor != expectedPrevHash) {
+          print('[FORENSIC-FAIL] El ancla del Ledger en session.lock no coincide con el estado actual.');
+          return false;
+        }
+      } catch (_) {}
+    }
+
+    return true;
+  }
+
   /// SSSoT: Verifies the tool itself against vault/self.hashes (VUL-01).
   Future<bool> verifySelf({required String toolRoot}) async {
     final selfHashesFile = File(p.join(toolRoot, 'vault', 'self.hashes'));

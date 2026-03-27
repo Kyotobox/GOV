@@ -59,7 +59,8 @@ void main(List<String> arguments) async {
   final parser = ArgParser()
     ..addCommand('act', ArgParser()
       ..addFlag('dry-run', negatable: false, help: 'Executes audit but does not persist pulse or history'))
-    ..addCommand('audit')
+    ..addCommand('audit', ArgParser()
+      ..addFlag('deep', negatable: false, help: 'Realiza una auditoría forense profunda de la cadena de bloques HISTORY.md.'))
     ..addCommand('baseline')
     ..addCommand('handover', ArgParser()
       ..addFlag('force', negatable: false, help: 'Force handover even if session is expired or invalid'))
@@ -102,7 +103,8 @@ void main(List<String> arguments) async {
 
   switch (command) {
     case 'audit':
-      final ok = await runAudit(basePath);
+      final deep = results.command?['deep'] ?? false;
+      final ok = await runAudit(basePath, deep: deep);
       if (!ok) exit(1);
       break;
     case 'act':
@@ -142,7 +144,7 @@ void main(List<String> arguments) async {
   }
 }
 
-Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false}) async {
+Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false, bool deep = false}) async {
   print('--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---');
   
   // TASK-S16-02: Kill-Switch (Zombie Sessions)
@@ -239,6 +241,17 @@ Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false}) async 
     final orphans = await integrity.detectOrphans(basePath: basePath);
     if (orphans.isNotEmpty) {
       print('\n  [!] WARNING: Archivos huérfanos detectados: ${orphans.join(", ")}\n');
+    }
+
+    // 6. Deep Forensic Audit (TASK-S19-03)
+    if (deep) {
+      print('--- [DEEP-AUDIT] VALIDACIÓN FORENSE DE CADENA ---');
+      final isChainOk = await integrity.verifyChain(basePath: basePath);
+      if (!isChainOk) {
+        allOk = false;
+      } else {
+        print('  [✅] FORENSIC-CHAIN: OK');
+      }
     }
 
     print('Audit COMPLETED.');
@@ -374,12 +387,11 @@ Future<void> runHandover(String basePath, String? keyPath, {bool force = false})
   final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
   final pulse = await telemetry.computePulse(basePath: basePath);
 
-  await vanguard.issueChallenge(
-    level: 'TACTICAL',
-    project: backlog['project'] ?? 'UNKNOWN',
-    files: ['session.lock', 'intel_pulse.json'],
-    basePath: basePath,
-  );
+  final poPublicKeyXml = await _resolvePublicKey(basePath);
+  if (poPublicKeyXml == null) {
+    print('[CRITICAL] No se encontró clave pública del PO para este proyecto.');
+    return;
+  }
 
   final challengeId = await vanguard.issueChallenge(
     level: 'TACTICAL',
@@ -391,6 +403,7 @@ Future<void> runHandover(String basePath, String? keyPath, {bool force = false})
   final signed = await vanguard.waitForSignature(
     basePath: basePath,
     challenge: challengeId,
+    publicKeyXml: poPublicKeyXml,
   );
   if (!signed) {
     print('[CRITICAL] Handover abortado: Se requiere firma del PO.');
