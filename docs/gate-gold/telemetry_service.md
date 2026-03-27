@@ -1,42 +1,44 @@
-# Servicio de Telemetría (TelemetryService)
+# Telemetría y Métricas (TelemetryService)
 
 **Ruta**: `lib/src/telemetry/telemetry_service.dart`
 **Nivel de Gobernanza**: GATE-GOLD
 
 ## 1. Resumen
 
-El `TelemetryService` es un componente `GATE-GOLD` cuya función es medir y cuantificar de forma objetiva la salud del sistema y la carga cognitiva del equipo de desarrollo. Genera dos métricas clave: el **System Health Score (SHS)** y el **Cognitive Pulse (CP)**. Estas métricas no son para evaluar el rendimiento, sino para actuar como un mecanismo de seguridad que previene el agotamiento (`burnout`) y la degradación de la calidad del código debido a la fatiga, siendo un pilar del protocolo de relevos (`Handover`).
+El `TelemetryService` es el componente `GATE-GOLD` de `antigravity_dpi` responsable de calcular y firmar métricas de telemetría, como el System Health Score (SHS) y el Cognitive Pulse (CP). Estas métricas proporcionan una visión objetiva del estado del sistema y la fatiga cognitiva del equipo, siendo esenciales para la gestión de relevos y la toma de decisiones informadas.
 
-## 2. Responsabilidades Clave
+## 2. Propósito
 
-- **Análisis del Historial Git**: Procesa el historial de `commits` desde el último `baseline` para extraer datos brutos (líneas añadidas, eliminadas, archivos modificados).
-- **Cálculo de SHS**: Calcula un puntaje de salud del sistema basado en la volatilidad y la frecuencia de los cambios en el código.
-- **Cálculo de Pulso Cognitivo (CP)**: Estima la carga cognitiva y la fatiga del equipo basándose en la intensidad y duración de las sesiones de trabajo.
-- **Integración de Fatiga Heredada**: Incorpora el valor de `inherited_fatigue` del `session.lock` para asegurar la continuidad de la métrica entre relevos.
-- **Generación de Reportes**: Provee los valores calculados para ser mostrados al usuario y almacenados en los registros de sesión.
+-   **Monitorización del Estado**: Proporcionar una visión cuantificable de la "salud" y "fatiga" del proyecto `antigravity_dpi` y los proyectos gobernados (ej. Base2).
+-   **Detección Temprana de Riesgos**: Identificar tendencias negativas que puedan indicar problemas de calidad, sobrecarga o riesgos técnicos.
+-   **Soporte a la Gobernanza**: Ofrecer datos objetivos para la planificación, asignación de recursos y gestión de la deuda técnica.
+-   **Persistencia de la Fatiga**: Asegurar que la fatiga cognitiva acumulada se herede entre sesiones, reflejando el costo real del desarrollo.
 
-## 3. Métricas Detalladas
+## 3. Componentes Involucrados
 
-### 3.1. System Health Score (SHS)
-El SHS es un indicador de la estabilidad del código base. Un SHS alto (cercano al 100%) indica un desarrollo estable y enfocado, mientras que un valor bajo puede sugerir refactorizaciones masivas, reversiones frecuentes o "churn" de código, lo que justifica una revisión.
+-   **`TelemetryService` (`lib/src/telemetry/telemetry_service.dart`)**: El motor principal para el cálculo de SHS y CP.
+-   **`ForensicLedger` (`lib/src/telemetry/forensic_ledger.dart`)**: Registra las métricas de pulso calculadas en el `HISTORY.md`.
+-   **`IntegrityEngine` (`lib/src/security/integrity_engine.dart`)**: Utilizado para verificar la integridad del `session.lock`, donde se persiste la fatiga heredada.
+-   **`DashboardEngine` (`lib/src/dash/dashboard_engine.dart`)**: Genera el `DASHBOARD.md` para visualizar las métricas.
 
-### 3.2. Cognitive Pulse (CP)
-El CP mide la "energía" invertida en el sprint. Se calcula a partir de la cantidad de cambios y la dispersión de estos a través de los archivos. Un CP muy alto y sostenido es una señal de alerta temprana de posible fatiga cognitiva en el equipo.
+## 4. Flujo de Operación
 
-## 4. Flujo de Cálculo
+1.  **Recopilación de Datos**: El servicio recopila datos relevantes del proyecto, como el historial de Git, líneas de código modificadas, frecuencia de operaciones de gobernanza y la fatiga heredada del `session.lock`.
+2.  **Cálculo del Pulso (`computePulse`)**: Utiliza un algoritmo propietario para calcular el `System Health Score (SHS)` y el `Cognitive Pulse (CP)`. El CP se acumula con cada operación y el SHS es una medida inversa.
+3.  **Persistencia del Pulso (`persistPulse`)**: Las métricas calculadas se guardan en un archivo `intel_pulse.json` dentro del `vault` y se registran en el `HISTORY.md`.
+4.  **Actualización del `session.lock`**: Durante operaciones como `handover`, el `shs_at_close` y el `inherited_fatigue` se actualizan en el `session.lock` para mantener la continuidad de la fatiga.
+5.  **Visualización**: Las métricas se utilizan para generar un `DASHBOARD.md` que proporciona una representación visual del estado de salud.
 
-1.  **Carga de Estado Inicial**: El servicio lee el `session.lock` para obtener el valor de `inherited_fatigue`, que representa la fatiga acumulada de sesiones anteriores.
-2.  **Análisis de Git**: Ejecuta un análisis sobre el repositorio Git para obtener un listado de `commits` y sus estadísticas (`--shortstat`) desde el último `baseline` o `takeover`.
-3.  **Procesamiento de Métricas**: Utiliza los datos de Git y el valor de fatiga heredada para aplicar las fórmulas matemáticas correspondientes y obtener los valores actuales de SHS y CP.
-4.  **Actualización de Estado**: Los valores calculados se utilizan para actualizar el estado de la sesión actual, y el valor de fatiga final se prepara para ser persistido en el siguiente `handover`, convirtiéndose en la `inherited_fatigue` de la próxima sesión.
+## 5. Hardening y Seguridad
 
-## 5. Integración y Protocolos
-
-- **Comando `gov status`**: Es el principal consumidor de este servicio, mostrando en tiempo real el SHS y CP al desarrollador.
-- **Protocolo `handover`**: Al finalizar una sesión, el valor final de fatiga se escribe en el archivo de relevo, asegurando que el siguiente analista tenga un punto de partida preciso sobre el estado cognitivo del proyecto, como lo exige el manifiesto `GEMINI.md`.
+-   **Cálculo Determinista**: Los algoritmos de cálculo de SHS/CP son deterministas, garantizando resultados consistentes.
+-   **Persistencia Criptográfica**: Las métricas se registran en el `HISTORY.md` (encadenado criptográficamente) y se anclan en el `session.lock` (protegido por HMAC), previniendo la manipulación de datos históricos.
+-   **Transparencia**: Las métricas son visibles y auditables, fomentando la confianza y la responsabilidad.
+-   **Self-Audit**: La integridad de `antigravity_dpi` se verifica antes de cada operación, asegurando la fiabilidad de la herramienta.
 
 ## 6. Artefactos Relacionados
 
--   `session.lock`: Almacena el valor de `inherited_fatigue` que sirve como entrada para el cálculo.
--   `.git/`: El historial de `commits` es la fuente primaria de datos para el análisis.
--   `HISTORY.md`: Aunque no es una entrada directa, los `baselines` registrados aquí definen los puntos de partida para el análisis de Git.
+-   `vault/intel_pulse.json`: Archivo JSON con las últimas métricas de pulso.
+-   `DASHBOARD.md`: Dashboard generado.
+-   `session.lock`: Almacena el `inherited_fatigue` y `shs_at_close`.
+-   `HISTORY.md`: Registro forense de `antigravity_dpi`.

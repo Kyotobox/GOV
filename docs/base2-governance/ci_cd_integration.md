@@ -65,6 +65,6 @@ Los siguientes comandos de `antigravity_dpi` son fundamentales para la integraci
 ## 6. Artefactos Relacionados
 
 -   `base2_project/TASK-DPI-ID.md`: Define el `Scope` para el `Scope-Lock` en CI/CD.
--   `base2_project/vault/kernel.hashes`: Manifiesto de integridad verificado en cada `audit`.
--   `base2_project/vault/kernel.hashes.sig`: Firma del manifiesto.
+-   `base2_project/vault/base2_manifest.hashes`: Manifiesto de integridad verificado en cada `audit`.
+-   `base2_project/vault/base2_manifest.hashes.sig`: Firma del manifiesto.
 -   `antigravity_dpi/HISTORY.md`: Registro de todas las operaciones de gobernanza.

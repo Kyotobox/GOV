@@ -20,7 +20,7 @@ Componentes responsables de la seguridad fundamental, la inmutabilidad y la veri
 
 ### 1.4. Registro Forense (ForensicLedger)
 *   **Descripción:** Proporciona un registro inmutable de todas las acciones realizadas en el sistema, permitiendo la auditoría y el seguimiento de cambios. Utiliza una cadena de hashes para asegurar la integridad del historial.
-*   **Documentación Detallada:** `gate-gold/forensic_ledger.md`
+*   **Documentación Detallada:** `base2-governance/forensic_ledger.md`
 
 ### 1.5. Gestión de Secretos (Vault)
 *   **Descripción:** Administra el almacenamiento y acceso seguro a los manifiestos de hashes, claves criptográficas y challenges de sesión. Es el repositorio de la verdad criptográfica.
@@ -41,11 +41,11 @@ Componentes que gestionan el flujo de trabajo, las tareas del desarrollador y la
 
 ### 2.3. Gestión de Sesiones (SessionManager)
 *   **Descripción:** Controla el ciclo de vida de las sesiones (`session.lock`), incluyendo los protocolos `handover`/`takeover`. Garantiza la continuidad y la preservación del estado entre relevos.
-*   **Documentación Detallada:** `gate-red/session_manager.md`
+*   **Documentación Detallada:** `base2-governance/session_anchoring.md`
 
 ### 2.4. Protección del Alcance (ComplianceGuard)
 *   **Descripción:** Previene la deriva de contexto (`scope-creep`) al restringir las modificaciones de archivos a las permitidas por la tarea activa, evitando cambios no autorizados.
-*   **Documentación Detallada:** `gate-red/compliance_guard.md`
+*   **Documentación Detallada:** `base2-governance/scope_lock.md`
 
 ### 2.5. Motor de Empaquetado (PackEngine)
 *   **Descripción:** Responsable de generar los paquetes de exportación (`gov pack`) para auditorías externas, asegurando que se incluya todo el código fuente relevante y se excluya la información sensible.

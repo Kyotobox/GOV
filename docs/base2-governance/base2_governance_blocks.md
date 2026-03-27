@@ -19,15 +19,15 @@ Este documento describe los bloques fundamentales de gobernanza que `antigravity
 ## 4. Detección de Archivos Huérfanos (Orphan Detection para Base2)
 *   **Descripción:** `antigravity_dpi` escaneará los directorios de los productos Base2 para identificar y alertar sobre cualquier archivo que no esté explícitamente registrado en el manifiesto de integridad firmado.
 *   **Aplicación en Base2:** Previene la inyección de código o artefactos no autorizados en los entornos de producción de Base2.
-*   **Documentación Detallada:** `base2-governance/orphan_detection.md` (futuro)
+ *   **Documentación Detallada:** `base2-governance/orphan_detection.md`
 ## 5. Verificación de Relevos (Relay Verification para Base2)
 *   **Descripción:** `antigravity_dpi` verificará que los despliegues o cambios en los productos Base2 se originen de un estado conocido y sellado, validando el `git_hash` y la firma RSA del Relay Atómico asociado a la operación.
 *   **Aplicación en Base2:** Asegura que cada cambio en Base2 provenga de una fuente autorizada y auditada, con un registro claro de su origen.
-*   **Documentación Detallada:** `base2-governance/relay_verification.md` (futuro)
+ *   **Documentación Detallada:** `base2-governance/relay_verification.md`
 ## 6. Telemetría de Salud del Sistema (SHS/CP para Base2)
 *   **Descripción:** `antigravity_dpi` calculará métricas como el System Health Score (SHS) y el Cognitive Pulse (CP) para los proyectos de Base2, proporcionando una visión objetiva de su "salud" y "fatiga".
 *   **Aplicación en Base2:** Ofrece indicadores tempranos de posibles problemas de calidad o sobrecarga en el desarrollo de Base2, permitiendo intervenciones proactivas.
-*   **Documentación Detallada:** `base2-governance/telemetry_metrics.md` (futuro)
+ *   **Documentación Detallada:** `base2-governance/telemetry_metrics.md`
 ## 7. Control de Cumplimiento (Scope-Lock para Base2)
 *   **Descripción:** `antigravity_dpi` aplicará reglas de "Scope-Lock" a los proyectos de Base2, asegurando que los cambios se realicen solo en las áreas de código designadas para una tarea específica.
 *   **Aplicación en Base2:** Impone disciplina en el desarrollo de Base2, evitando cambios accidentales o no autorizados fuera del alcance de una tarea definida.
