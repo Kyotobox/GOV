@@ -182,7 +182,7 @@ Future<void> _runBaseline(String basePath, String message) async {
     // 1. Issue Challenge (S22 Refactor: Use library signature)
     finalChallengeId = await vanguard.issueChallenge(
       level: effectiveLevel,
-      project: 'antigravity_dpi',
+      project: 'antigravity-dpi',
       files: swelling.files,
       basePath: basePath,
       description: message,

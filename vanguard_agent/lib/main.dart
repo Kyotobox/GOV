@@ -522,7 +522,7 @@ class _AgentHomeState extends State<AgentHome> {
             isKernelCore ? '⚖ VANGUARD: GOLD INMUTABLE' :
             isKernel ? '⚠️ VANGUARD: KERNEL RED' : 
             isTactical ? '📈 VANGUARD: TACTICAL ORANGE' :
-            '🔒 VANGUARD: OPERATIONAL v5.1',
+            '🔒 VANGUARD: OPERATIONAL v5.2-DPI',
             style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 13),
           ),
           actions: [
