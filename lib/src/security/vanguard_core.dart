@@ -80,7 +80,15 @@ class VanguardCore {
     } finally {
       await subscription.cancel();
       // VUL-25: Eliminar firma tras uso para evitar re-uso (Replay Protection)
-      if (sigFile.existsSync()) await sigFile.delete();
+      // Solo si el proceso fue completado exitosamente para ese desafío.
+      if (completer.isCompleted && sigFile.existsSync()) {
+        try {
+          final data = jsonDecode(await sigFile.readAsString());
+          if (data['challenge'] == challenge) {
+            await sigFile.delete();
+          }
+        } catch (_) {}
+      }
     }
   }
 

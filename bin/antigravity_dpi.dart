@@ -142,7 +142,7 @@ Future<void> _runBaseline(String basePath, String message) async {
 
   final vanguard = VanguardCore();
   final publicKeyFile = File(p.join(basePath, 'vault', 'intel', 'guard_pub.xml'));
-  
+
   if (!publicKeyFile.existsSync()) {
     print('[ERROR] No se encontró guard_pub.xml. El sistema no puede verificar tu identidad.');
     exit(1);
@@ -161,34 +161,50 @@ Future<void> _runBaseline(String basePath, String message) async {
      print('[!] ALERTA BLACK-GATE: Cambios en archivos del núcleo detectados.');
   }
 
-  // 1. Issue Challenge (S22 Refactor: Use library signature)
-  final issuedId = await vanguard.issueChallenge(
-    level: effectiveLevel,
-    project: 'antigravity_dpi',
-    files: swelling.files,
-    basePath: basePath,
-    description: message,
-  );
+  // --- [NONCE PERSISTENCE] ---
+  final challengeFile = File(p.join(basePath, 'vault', 'intel', 'challenge.json'));
+  String finalChallengeId = challengeId;
   
-  // Si no fue BLACK-GATE, usamos el ID normal; si lo fue, usamos el ID de coreChangeId
-  final finalChallengeId = challengeId.isNotEmpty ? challengeId : issuedId;
-  if (challengeId.isNotEmpty) {
-     // Re-escribir el ID en el challenge.json para forzar el nivel BLACK-GATE
-     final challengeFile = File(p.join(basePath, 'vault', 'intel', 'challenge.json'));
+  if (challengeFile.existsSync() && coreChangeId == null) {
+    try {
+      final challengeData = jsonDecode(await challengeFile.readAsString());
+      final challengeTimestamp = DateTime.parse(challengeData['timestamp']);
+      
+      // Si el desafío tiene menos de 10 minutos, lo RE-UTILIZAMOS para evitar loop
+      if (DateTime.now().difference(challengeTimestamp).inMinutes < 10) {
+        finalChallengeId = challengeData['challenge'];
+        print('[INFO] Reutilizando desafío existente para evitar ID-Loop (Expira en ${10 - DateTime.now().difference(challengeTimestamp).inMinutes}m).');
+      }
+    } catch (_) { /* Fallback a nuevo desafío */ }
+  }
+
+  if (finalChallengeId.isEmpty) {
+    // 1. Issue Challenge (S22 Refactor: Use library signature)
+    final issuedId = await vanguard.issueChallenge(
+      level: effectiveLevel,
+      project: 'antigravity_dpi',
+      files: swelling.files,
+      basePath: basePath,
+      description: message,
+    );
+    finalChallengeId = issuedId;
+  }
+  
+  // Si fue BLACK-GATE, forzamos ese ID en el JSON
+  if (coreChangeId != null) {
      final challengeData = jsonDecode(await challengeFile.readAsString());
      challengeData['challenge'] = challengeId;
      challengeData['level'] = 'BLACK-GATE';
      await challengeFile.writeAsString(jsonEncode(challengeData));
+     finalChallengeId = challengeId;
   }
-
-  // S21-01: Removed autoSign call. Oráculo is now Zero-Trust.
 
   // 3. Wait for Verification
   final isSigned = await vanguard.waitForSignature(
     basePath: basePath,
     challenge: finalChallengeId,
     publicKeyXml: publicKeyXml,
-    timeoutSeconds: 120,
+    timeoutSeconds: 300, // 5 minutos para firma manual
   );
 
   if (!isSigned) {
