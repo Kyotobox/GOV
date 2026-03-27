@@ -1,2 +1,2 @@
 @echo off
-gov.exe %*
+dart run bin/antigravity_dpi.dart %*
