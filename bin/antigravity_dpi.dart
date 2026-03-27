@@ -188,7 +188,7 @@ Future<void> _runBaseline(String basePath, String message) async {
     basePath: basePath,
     challenge: finalChallengeId,
     publicKeyXml: publicKeyXml,
-    timeoutSeconds: 30,
+    timeoutSeconds: 120,
   );
 
   if (!isSigned) {
