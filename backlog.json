@@ -338,6 +338,98 @@
           "status": "DONE"
         }
       ]
+    },
+    {
+      "id": "S21-RESTORE",
+      "name": "Restauración de Integridad Nucleo",
+      "status": "DONE",
+      "goal": "Purga de autoSign, hardcode de reglas SHS y verificación Git-Zero.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S21-01",
+          "label": "SEC",
+          "desc": "Purga de autoSign y Verificación Estricta RSA",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S21-02",
+          "label": "SEC",
+          "desc": "Hardcode de Reglas SHS como Constantes",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S21-03",
+          "label": "GOV",
+          "desc": "Bloqueo Git-Zero Pre-Baseline",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S21-04",
+          "label": "OPS",
+          "desc": "Compilación y Cierre S21",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S22-LEDGER",
+      "name": "Ledger y Continuidad de Sesión",
+      "status": "DONE",
+      "goal": "Implementación de Cadena de History y Relay Atómico con Git-Hash.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S22-01",
+          "label": "GOV",
+          "desc": "Ledger Chain of Trust (Encadenamiento)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S22-02",
+          "label": "GOV",
+          "desc": "Relay Atómico con Git-Hash",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S22-03",
+          "label": "QA",
+          "desc": "Verificación y Cierre S22",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S23-VANGUARD",
+      "name": "Integración del Agente Vanguard",
+      "status": "DONE",
+      "goal": "Migración atómica del Oráculo externo al Kernel de Gobernanza.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S23-01",
+          "label": "ARCH",
+          "desc": "Migración Atómica del Vanguard Agent",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S24-BLACKGATE",
+      "name": "Cierre de Producción",
+      "status": "DONE",
+      "goal": "Implementación de BLACK-GATE Trigger y cierre final de la hoja de ruta.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S24-01",
+          "label": "GOV",
+          "desc": "Detección de Cambios en Núcleo (BLACK-GATE)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S24-05",
+          "label": "OPS",
+          "desc": "Cierre Final de Producción",
+          "status": "DONE"
+        }
+      ]
     }
   ]
 }

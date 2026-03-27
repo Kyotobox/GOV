@@ -7,6 +7,11 @@ import 'sign_engine.dart';
 
 /// IntegrityEngine: Verifies the integrity of kernel files against the signed manifest.
 class IntegrityEngine {
+  // S21-02: Reglas de Saturación (Inmutables)
+  static const int kMaxRootFiles = 15;
+  static const double kZombiePenalty = 20.0;
+  static const double kPanicThreshold = 90.0;
+
   final SignEngine _signer = SignEngine();
 
   /// S19-FORTRESS: Verifies the cryptographic chain of HISTORY.md (VUL-11/12).
@@ -270,5 +275,30 @@ class IntegrityEngine {
 
     print('  [✅] LEDGER-ANCHOR: OK');
     return true;
+  }
+
+  /// S22-01: Verifies the SHS Root Density (Limit: 15).
+  Future<({int fileCount, List<String> files})> checkSwelling(String basePath) async {
+    final rootDir = Directory(basePath);
+    final files = rootDir.listSync().whereType<File>().map((e) => p.basename(e.path)).toList();
+    return (fileCount: files.length, files: files);
+  }
+
+  /// S22-01: Detects non-allowed "Zombie" files in root.
+  Future<List<String>> checkZombies(String basePath) async {
+    final allowed = {
+      'GEMINI.md', 'VISION.md', 'METHODOLOGY.md', 'PROJECT_LOG.md', 
+      'task.md', 'backlog.json', 'DASHBOARD.md', 'README.md', 
+      '.gitignore', 'pubspec.yaml', 'pubspec.lock', 'analysis_options.yaml'
+    };
+    final root = Directory(basePath).listSync().whereType<File>();
+    final zombies = <String>[];
+    for (var f in root) {
+      final name = p.basename(f.path);
+      if (!allowed.contains(name) && !name.startsWith('.') && !name.endsWith('.exe')) {
+        zombies.add(name);
+      }
+    }
+    return zombies;
   }
 }

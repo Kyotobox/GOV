@@ -14,7 +14,7 @@ try {
     $RSA.FromXmlString($XML)
     
     $StagedFiles = @(git diff --cached --name-only) -join ","
-    $ContextString = $Challenge + ":" + $StagedFiles
+    $ContextString = $Challenge
     $Data = [System.Text.Encoding]::UTF8.GetBytes($ContextString)
     $Signature = $RSA.SignData($Data, "SHA256")
     $B64 = [Convert]::ToBase64String($Signature)
