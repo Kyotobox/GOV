@@ -25,6 +25,7 @@ El directorio `vault/` contiene los siguientes archivos y subdirectorios crític
 -   `vault/ai_context.txt`: Un archivo generado por el `ContextEngine` que contiene fragmentos de código fuente y documentación relevantes para la tarea activa, utilizado por la IA para focalizar su análisis.
 -   `vault/intel/`: Subdirectorio que contiene métricas volátiles de telemetría, como `session_turns.txt` y `chat_count.txt`, utilizadas por el `TelemetryService`.
 -   `vault/.gov_rate`: Archivo utilizado por el mecanismo Anti-Loop (CLI Rate Limiting) para almacenar timestamps de invocaciones.
+-   `vault/.gov_rate`: Archivo JSON que almacena los timestamps de las últimas invocaciones de la CLI para implementar el mecanismo de "Anti-Loop" (Rate Limiting).
 
 ## 4. Mecanismos de Seguridad Implementados
 
@@ -35,7 +36,8 @@ La seguridad del directorio `vault/` se refuerza mediante varios mecanismos:
 -   **Exclusión de Empaquetado (VUL-10 Mitigado)**: El `PackEngine` excluye explícitamente el directorio `vault/` de los paquetes de exportación (`audit_export_*.zip`), previniendo la fuga de información sensible a auditores externos o entornos no controlados.
 -   **Acceso Controlado por el Sistema**: Se asume que el sistema operativo subyacente impone permisos de archivo adecuados para restringir el acceso no autorizado al directorio `vault/`.
 -   **Registro Forense**: Todas las operaciones significativas que interactúan con los contenidos del `vault/` (ej. `baseline`, `handover`, `takeover`) son registradas en el `HISTORY.md` por el `ForensicLedger`, proporcionando una pista de auditoría inmutable.
--   **Vinculación Segura de Claves (VUL-02 Mitigado)**: El comando `gov vault bind-key` permite vincular rutas a claves RSA de forma segura, evitando la exposición de rutas de claves privadas directamente en los argumentos de la CLI.
+-   **Vinculación y Rotación Segura de Claves (VUL-02 Mitigado)**: Los comandos `gov vault bind-key` y `gov vault rotate-keys` permiten gestionar el ciclo de vida de las claves RSA de forma segura, evitando la exposición de rutas o material criptográfico en los argumentos de la CLI.
+-   **Anti-Loop (Rate Limiting) (S16-03)**: El uso de `vault/.gov_rate` previene ataques de denegación de servicio o bucles accidentales al limitar el número de ejecuciones de la CLI en un corto período de tiempo.
 
 ## 5. Componentes que Interactúan con `vault/`
 
@@ -45,7 +47,8 @@ La seguridad del directorio `vault/` se refuerza mediante varios mecanismos:
 -   **`ForensicLedger`**: Actualiza el `ledger_tip_hash` en `session.lock` y utiliza `vault/history.lock` para exclusión mutua.
 -   **`PackEngine`**: Excluye `vault/` de los paquetes de exportación.
 -   **`ContextEngine`**: Escribe `ai_context.txt` en `vault/`.
--   **CLI (`gov.exe`)**: Gestiona la vinculación de claves a través del comando `gov vault`.
+-   **`KeyGenerator`**: Utilizado por `gov vault rotate-keys` para generar nuevos pares de claves RSA.
+-   **CLI (`gov.exe`)**: Gestiona el ciclo de vida de las claves a través de los subcomandos de `gov vault`.
 
 ## 6. Hardening y Evolución
 
@@ -54,7 +57,7 @@ El diseño y la implementación de la seguridad del `vault/` han evolucionado a 
 -   **Sprint S11-HOTFIX**: Mitigación de `VUL-10` (fuga de `vault/` en `pack`) y `VUL-16` (HMAC en `session.lock`).
 -   **Sprint S12-INTEGRITY**: Mitigación de `VUL-02` (vinculación segura de claves) y `VUL-08` (firma de `kernel.hashes`).
 -   **Sprint S13-IMMUTABILITY**: Mitigación de `VUL-11` (anclaje del `ForensicLedger` en `session.lock`).
--   **Sprint S16-FACTORY-OPS**: Implementación del mecanismo Anti-Loop que utiliza `vault/.gov_rate`.
+-   **Sprint S16-FACTORY-OPS**: Implementación del mecanismo Anti-Loop (`.gov_rate`), Kill-Switch para sesiones zombie y auto-commit semántico en `baseline`.
 
 ## 7. Consideraciones Adicionales
 

@@ -28,33 +28,33 @@ El protocolo de relevos (`handover` / `takeover`) es el mecanismo central para l
 1.  **Pre-condiciones**:
     - El sistema debe estar en un estado íntegro (ejecutar `gov audit`).
     - Debe haber una tarea activa en progreso.
-2.  **Cálculo de Telemetría**:
-    - El `TelemetryService` calcula el `System Health Score (SHS)` y el `Cognitive Pulse (CP)` de la sesión actual.
-3.  **Generación del Relay**:
-    - Se crea un archivo de relevo (`session_relay.json`) que contiene:
-        - El estado del sistema (archivos modificados, configuraciones).
-        - El valor de `inherited_fatigue`.
-        - El hash del último commit de Git.
-        - Una firma RSA del Product Owner (PO) autorizando el relevo.
+2.  **Cálculo de Telemetría y Aprobación del PO**:
+    - El `TelemetryService` calcula el `System Health Score (SHS)` de la sesión.
+    - El `VanguardCore` emite un desafío de nivel `TACTICAL`, solicitando una firma del PO para autorizar el cierre de sesión.
+    - Si la firma no es validada, el `handover` se aborta.
 4.  **Sellado del `session.lock`**:
-    - El archivo `session.lock` se actualiza con el estado `HANDOVER_SEALED` y se incluye el hash del `session_relay.json`.
+    - Se captura el hash corto del commit de Git (`git rev-parse --short HEAD`).
+    - El archivo `session.lock` se actualiza con:
+        - `status`: `HANDOVER_SEALED`
+        - `shs_at_close`: El valor de saturación del SHS, que se convertirá en la fatiga heredada.
+        - `git_hash`: El hash de Git capturado.
+    - Se genera un nuevo HMAC (`_mac`) para proteger la integridad del archivo.
 5.  **Registro en el `HISTORY.md`**:
-    - Se añade una entrada al `HISTORY.md` que registra el evento de `handover`, incluyendo el SHS, el hash de Git y la referencia al archivo de relevo.
+    - Se añade una entrada al `HISTORY.md` que registra el evento de `handover`, incluyendo el SHS y el hash de Git.
 
 ### 4.2. Takeover (Reanudación de Sesión)
 
 1.  **Pre-condiciones**:
     - Debe existir un archivo `session.lock` con estado `HANDOVER_SEALED`.
-    - El usuario que intenta el `takeover` debe tener la autorización del PO (verificar la firma RSA en el `session_relay.json`).
-2.  **Validación del Relay**:
-    - Se verifica la integridad del `session_relay.json` comparando el hash almacenado en el `session.lock`.
-    - Se valida la firma RSA del PO en el `session_relay.json`.
-3.  **Reconstrucción del Estado**:
-    - Se aplica el estado del sistema almacenado en el `session_relay.json` (restaurando archivos modificados, configuraciones, etc.).
+2.  **Validación de Integridad**:
+    - Se verifica la integridad del `session.lock` validando su HMAC (`_mac`).
+    - Se compara el `git_hash` almacenado en el `session.lock` con el hash del `HEAD` actual del repositorio para prevenir `GIT-DRIFT`.
+    - Se ejecuta una auditoría completa (`gov audit`) del sistema.
 4.  **Actualización del `session.lock`**:
-    - El archivo `session.lock` se actualiza con el estado `IN_PROGRESS`, el nuevo timestamp y el valor de `inherited_fatigue` transferido del `session_relay.json`.
+    - El archivo `session.lock` se actualiza con el estado `IN_PROGRESS`, un nuevo `timestamp` y el valor de `inherited_fatigue` (que se toma del `shs_at_close` de la sesión anterior).
+    - Se genera un nuevo HMAC (`_mac`).
 5.  **Registro en el `HISTORY.md`**:
-    - Se añade una entrada al `HISTORY.md` que registra el evento de `takeover`, incluyendo la referencia al archivo de relevo y el valor de `inherited_fatigue`.
+    - Se añade una entrada al `HISTORY.md` que registra el evento de `takeover`, incluyendo el valor de `inherited_fatigue`.
 
 ## 5. Diagrama de Flujo (Opcional)
 

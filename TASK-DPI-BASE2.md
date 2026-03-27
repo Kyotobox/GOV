@@ -1,7 +1,8 @@
 # TASK-DPI-BASE2: Protocolo de Integración y Pase a Producción (BASE2)
 
 > [!IMPORTANT]
-> **PRE-REQUISITOS**: S19-FORTRESS (verificación de cadena y tests unitarios) está 100% completado, validado y fusionado en el kernel actual.
+> **ESTADO DE PRE-REQUISITOS**:
+> - [x] **S19-FORTRESS** (verificación de cadena criptográfica y tests unitarios) completado, validado y fusionado en el kernel.
 
 ## FASE 0: Deprecación del Esquema Legacy (PS/OPS)
 1. **Limpieza de Scripts de Validación**: Identificar y eliminar todos los scripts de PowerShell (`.ps1`) y archivos de configuración `.ops` que gobernaban el esquema de validación anterior.

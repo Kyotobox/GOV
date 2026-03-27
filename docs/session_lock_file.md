@@ -12,7 +12,7 @@ El `session.lock` cumple múltiples propósitos esenciales:
 -   **Persistencia de Estado de Sesión**: Almacena información vital sobre la sesión actual, como el `timestamp` de inicio, el `inherited_fatigue` y el `git_hash` del último estado sellado.
 -   **Anclaje de Integridad**: Sirve como ancla criptográfica para el `ForensicLedger` (`ledger_tip_hash`) y para la verificación de la integridad del propio archivo mediante un HMAC (`_mac`).
 -   **Mecanismo de Relevo**: Facilita el protocolo `handover`/`takeover` al encapsular el estado necesario para una transferencia de sesión segura y certificada.
--   **Detección de Sesiones Zombie**: Su `timestamp` se utiliza para detectar y alertar sobre sesiones inactivas que exceden un límite de tiempo, activando un "kill-switch" preventivo.
+-   **Detección de Sesiones Zombie (Kill-Switch)**: Su `timestamp` se utiliza para detectar y alertar sobre sesiones inactivas que exceden un límite de tiempo (8 horas), activando un "kill-switch" preventivo que bloquea operaciones hasta que se fuerce un `handover`.
 
 ## 3. Estructura del Archivo
 
@@ -54,7 +54,7 @@ El `session.lock` es un archivo JSON con la siguiente estructura (ejemplo):
 -   **HMAC (`_mac`) (VUL-16 Mitigado)**: Este es el mecanismo de seguridad más crítico del `session.lock`. Un HMAC SHA-256 se calcula sobre el resto del contenido del archivo y se almacena. Cualquier intento de modificar el `session.lock` sin recalcular el HMAC resultará en una falla de integridad detectada por el `IntegrityEngine`, abortando cualquier operación.
 -   **Anclaje del Ledger (`ledger_tip_hash`) (VUL-11 Mitigado)**: Almacenar el hash de la última entrada del `HISTORY.md` en el `session.lock` (protegido por HMAC) previene la reescritura del historial. Si el `HISTORY.md` es manipulado, su hash no coincidirá con el ancla, activando una alerta crítica.
 -   **Verificación de `git_hash`**: Durante el `takeover`, se compara el `git_hash` registrado en el `session.lock` con el `HEAD` actual del repositorio. Esto previene la reanudación de una sesión en un estado de código inconsistente.
--   **Kill-Switch de Sesiones Zombie (S16-02)**: El `timestamp` se utiliza para invalidar sesiones que han estado `IN_PROGRESS` por un tiempo excesivo (ej. 8 horas), forzando un `handover` para liberar el kernel.
+-   **Kill-Switch de Sesiones Zombie (S16-02)**: El `timestamp` se utiliza durante la auditoría para invalidar sesiones que han estado `IN_PROGRESS` por un tiempo excesivo (ej. 8 horas), forzando un `handover --force` para liberar el kernel y prevenir bloqueos indefinidos.
 
 ## 6. Componentes que Interactúan con `session.lock`
 
