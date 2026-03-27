@@ -11,6 +11,9 @@ import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/core/pack_engine.dart';
 import 'package:antigravity_dpi/src/core/context_engine.dart';
 import 'package:antigravity_dpi/src/core/hook_engine.dart';
+import 'package:antigravity_dpi/src/core/test_engine.dart';
+import 'package:antigravity_dpi/src/core/reconstitution_engine.dart';
+import 'package:antigravity_dpi/src/core/report_engine.dart';
 import 'package:path/path.dart' as p;
 
 const String version = '1.0.0';
@@ -71,6 +74,7 @@ void main(List<String> arguments) async {
         ..addOption('key', abbr: 'k', help: 'Path to RSA XML Key'))
       ..addCommand('status'))
     ..addCommand('pack')
+    ..addCommand('report')
     ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
     ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
 
@@ -118,6 +122,9 @@ void main(List<String> arguments) async {
       break;
     case 'pack':
       await runPack(basePath);
+      break;
+    case 'report':
+      await runReport(basePath);
       break;
     case 'vault':
       await runVault(basePath, results.command!);
@@ -322,6 +329,17 @@ Future<void> runStatus(String basePath) async {
 Future<void> runContext(String basePath) async {
   final engine = ContextEngine();
   await engine.generateContext(basePath: basePath);
+}
+
+Future<void> runRestore(String basePath) async {
+  final engine = ReconstitutionEngine();
+  await engine.restore(basePath: basePath);
+}
+
+Future<void> runReport(String basePath) async {
+  final engine = ReportEngine();
+  final report = await engine.generateExecutiveReport(basePath);
+  print(report);
 }
 
 Future<void> runHook(String basePath, ArgResults command) async {

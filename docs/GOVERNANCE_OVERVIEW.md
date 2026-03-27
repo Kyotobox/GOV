@@ -10,7 +10,6 @@ Componentes responsables de la seguridad fundamental, la inmutabilidad y la veri
 ### 1.1. Motor de Integridad (IntegrityEngine)
 *   **Descripción:** Responsable de verificar la integridad del código fuente (`Self-Audit`) y los artefactos del sistema (`kernel.hashes`). Utiliza hashes criptográficos para asegurar que no se realicen modificaciones no autorizadas.
 *   **Documentación Detallada:** `gate-gold/integrity_engine.md`
-
 ### 1.2. Motor Criptográfico (SignEngine)
 *   **Descripción:** Gestiona todas las operaciones de firma y verificación RSA. Es el núcleo de la confianza para la validación de claves, sesiones y artefactos críticos.
 *   **Documentación Detallada:** `gate-gold/sign_engine.md`

@@ -250,27 +250,27 @@
     {
       "id": "S17-RELIABILITY",
       "name": "Integridad de Pruebas (TestGuard)",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Integrar ejecución obligatoria de tests en el baseline.",
       "tasks": [
         {
           "id": "TASK-DPI-S17-01",
           "label": "QA",
           "desc": "TestGuard Integration",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S17-02",
           "label": "SEC",
           "desc": "Reconstitution Engine (gov restore)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     },
     {
       "id": "S18-UNIVERSAL-GOV",
       "name": "Reporteo Avanzado y Roles",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "goal": "Generación de reportes ejecutivos con atribución de roles.",
       "tasks": [
         {

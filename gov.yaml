@@ -1,0 +1,27 @@
+# antigravity_dpi - Project Scope Configuration
+# Define file patterns governed by each role.
+
+scopes:
+  UI: [
+    "*.html",
+    "*.css",
+    "lib/src/ui/**",
+    "web/**"
+  ]
+  SEC: [
+    "lib/src/security/**",
+    "vault/**"
+  ]
+  ARCH: [
+    "lib/src/core/**",
+    "bin/**",
+    "pubspec.yaml",
+    "gov.yaml",
+    "VISION.md",
+    "GEMINI.md",
+    "backlog.json"
+  ]
+  GOV: [
+    "HISTORY.md",
+    "lib/src/tasks/**"
+  ]

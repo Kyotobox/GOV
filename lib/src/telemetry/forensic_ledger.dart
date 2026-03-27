@@ -15,14 +15,16 @@ class ForensicLedger {
     required String task,
     required String detail,
     required String basePath,
+    String? role,
   }) async {
     final historyFile = File(p.join(basePath, 'HISTORY.md'));
     String prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
 
+    final effectiveRole = role ?? 'AI';
+
     print('DEBUG: ForensicLedger [${historyFile.absolute.path}] START_APPEND');
 
     // VUL-12: Implementamos bloqueo de archivo para evitar condiciones de carrera.
-    // Usamos un archivo de bloqueo externo para sincronizar la lectura y escritura del ledger.
     final lockFile = File(p.join(basePath, 'vault', 'history.lock'));
     if (!await lockFile.parent.exists()) await lockFile.parent.create(recursive: true);
     final lockRaf = await lockFile.open(mode: FileMode.write);
@@ -30,7 +32,6 @@ class ForensicLedger {
     try {
       await lockRaf.lock(FileLock.blockingExclusive);
 
-      // Leemos el archivo para obtener el último hash de forma segura bajo el lock.
       if (await historyFile.exists()) {
         final lines = await historyFile.readAsLines();
         if (lines.isNotEmpty) {
@@ -41,13 +42,13 @@ class ForensicLedger {
         }
       } else {
         // Inicializar el Ledger si no existe
-        final header = '| Timestamp | SessionID | PrevHash | Type | Task | Detail |\n'
-                       '| :--- | :--- | :--- | :--- | :--- | :--- |\n';
+        final header = '| Timestamp | Role | SessionID | PrevHash | Type | Task | Detail |\n'
+                       '| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n';
         await historyFile.writeAsString(header);
       }
 
       final timestamp = _formatTimestamp(DateTime.now());
-      final entry = '| $timestamp | $sessionId | $prevHash | $type | $task | $detail |';
+      final entry = '| $timestamp | $effectiveRole | $sessionId | $prevHash | $type | $task | $detail |';
       
       await historyFile.writeAsString('$entry\n', mode: FileMode.append, flush: true);
       

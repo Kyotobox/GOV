@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 /// ComplianceGuard: Enforces scope-lock and referential task integrity.
 class ComplianceGuard {
-  // Scope definitions migrated from Base2/ops-audit.ps1
-  static final Map<String, List<RegExp>> scopeRules = {
+  // Scope definitions - these can be overridden by gov.yaml
+  static Map<String, List<RegExp>> scopeRules = {
     'UI': [RegExp(r'lib/.*\.dart'), RegExp(r'assets/.*')],
     'DATA': [RegExp(r'lib/.*\.dart')],
     'SHELL': [RegExp(r'.*\.ps1'), RegExp(r'.*\.bat'), RegExp(r'pubspec\.yaml')],
@@ -12,6 +13,48 @@ class ComplianceGuard {
     'SEC': [RegExp(r'lib/src/security/.*'), RegExp(r'vault/.*')],
     'PLAN': [RegExp(r'.*\.md'), RegExp(r'\.meta/.*')],
   };
+
+  ComplianceGuard({String? basePath}) {
+    if (basePath != null) {
+      _loadDynamicScopes(basePath);
+    }
+  }
+
+  void _loadDynamicScopes(String basePath) {
+    final file = File(p.join(basePath, 'gov.yaml'));
+    if (!file.existsSync()) return;
+
+    try {
+      final doc = loadYaml(file.readAsStringSync());
+      if (doc != null && doc['scopes'] != null) {
+        final YamlMap yamlScopes = doc['scopes'];
+        final Map<String, List<RegExp>> newRules = {};
+        
+        yamlScopes.forEach((key, value) {
+          if (value is YamlList) {
+            final List<RegExp> patterns = [];
+            for (var item in value) {
+              // Convert glob-like pattern to basic RegExp
+              var pattern = item.toString()
+                  .replaceAll('.', r'\.')
+                  .replaceAll('*', '.*')
+                  .replaceAll('?', '.')
+                  .replaceAll('/**', '/.*');
+              patterns.add(RegExp('^$pattern\$', caseSensitive: false));
+            }
+            newRules[key.toString()] = patterns;
+          }
+        });
+
+        if (newRules.isNotEmpty) {
+          scopeRules = newRules;
+          print('DEBUG-COMPLIANCE: Reglas de Scope cargadas dinámicamente desde gov.yaml');
+        }
+      }
+    } catch (e) {
+      print('[WARNING] Error parseando gov.yaml: $e. Usando reglas por defecto.');
+    }
+  }
 
   /// Archivos de sistema gestionados por gov.exe que están exentos del Scope-Lock estricto.
   static const List<String> systemExemptions = [
@@ -225,6 +268,46 @@ class ComplianceGuard {
       throw ComplianceException(
         'SCOPE-VIOLATION: Intento de modificar archivos fuera del scope de $taskId: ${violations.join(", ")}',
       );
+    }
+
+    // 4. Role-Based Verification from gov.yaml
+    // For simplicity in this DPI, we assume roles are mapped by Sprint ID or extracted from task metadata.
+    // If the task content has "[ARCH]" or "[SEC]", we apply those rules globally.
+    final taskContent = await File(p.join(basePath, '$taskId.md')).readAsString();
+    String? role;
+    if (taskContent.contains('[ARCH]')) role = 'ARCH';
+    else if (taskContent.contains('[SEC]')) role = 'SEC';
+    else if (taskContent.contains('[UI]')) role = 'UI';
+    else if (taskContent.contains('[GOV]')) role = 'GOV';
+
+    if (role != null && scopeRules.containsKey(role)) {
+      final roleRules = scopeRules[role]!;
+      for (final file in modifiedFiles) {
+        final cleanFile = p.relative(p.canonicalize(p.join(basePath, file)), from: p.canonicalize(basePath)).replaceAll('\\', '/');
+        
+        bool allowedByRole = false;
+        for (final regex in roleRules) {
+          if (regex.hasMatch(cleanFile)) {
+            allowedByRole = true;
+            break;
+          }
+        }
+
+        // System exemptions still apply
+        bool isExempt = false;
+        for (final exempt in systemExemptions) {
+           if (cleanFile.toLowerCase().contains(exempt.toLowerCase())) {
+             isExempt = true; break;
+           }
+        }
+
+        if (!allowedByRole && !isExempt) {
+          throw ComplianceException(
+            'ROLE-VIOLATION: El archivo $file no pertenece al scope dinámico del rol $role definido en gov.yaml',
+          );
+        }
+      }
+      print('DEBUG-COMPLIANCE: Dinamic Role Scope Verified for $role');
     }
   }
 }
