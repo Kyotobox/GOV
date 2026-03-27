@@ -45,12 +45,7 @@ class VanguardCore {
     final intelDir = p.join(basePath, 'vault', 'intel');
     final sigFile = File(sigPath);
     
-    if (await sigFile.exists()) {
-      print('[VANGUARD] Firma DETECTADA ✅ (Existente)');
-      return true;
-    }
-
-    print('[VANGUARD] Esperando firma del PO (REACTIVO, timeout: ${timeoutSeconds}s)...');
+    print('[VANGUARD] Esperando firma del PO (REACTIVO-RESILIENTE, timeout: ${timeoutSeconds}s)...');
     
     final completer = Completer<bool>();
     final watcher = DirectoryWatcher(intelDir);
@@ -62,6 +57,11 @@ class VanguardCore {
         if (!completer.isCompleted) completer.complete(true);
       }
     });
+
+    // Check if it already exists slightly AFTER starting the watcher to bridge the gap
+    if (await sigFile.exists()) {
+      if (!completer.isCompleted) completer.complete(true);
+    }
 
     try {
       final result = await completer.future.timeout(

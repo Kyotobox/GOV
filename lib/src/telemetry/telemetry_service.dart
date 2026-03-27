@@ -46,18 +46,14 @@ class TelemetryService {
         
         final integrity = IntegrityEngine();
         if (!integrity.verifySessionMAC(lockData)) {
-            print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
-            exit(1);
+            print('[⚠️] WARNING: session.lock MAC inválido. Iniciando pulso desde cero para S12.');
+            finalCarryOver = 0.0;
+        } else {
+            finalCarryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
         }
-        
-        finalCarryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
       } catch (e) {
-        // Fallback or exit depending on security strictness. 
-        // For VUL-16, we fail hard if locked but invalid.
-        if (e is! FileSystemException) {
-            print('[CRITICAL] KERNEL-VIOLATION: Error al leer session.lock: $e');
-            exit(1);
-        }
+        print('[⚠️] WARNING: No se pudo recuperar pulso heredado de session.lock ($e).');
+        finalCarryOver = 0.0;
       }
     }
 

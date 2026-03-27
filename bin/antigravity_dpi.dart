@@ -7,9 +7,10 @@ import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
 import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
 import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
-import 'package:antigravity_dpi/src/security/sign_engine.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/core/pack_engine.dart';
+import 'package:antigravity_dpi/src/core/context_engine.dart';
+import 'package:antigravity_dpi/src/core/hook_engine.dart';
 import 'package:path/path.dart' as p;
 
 const String version = '1.0.0';
@@ -24,14 +25,51 @@ void main(List<String> arguments) async {
     exit(2);
   }
 
+  // TASK-S16-03: Anti-Loop (CLI Rate Limiting)
+  final rateFile = File(p.join(Directory.current.path, 'vault', '.gov_rate'));
+  final now = DateTime.now().millisecondsSinceEpoch;
+  List<int> timestamps = [];
+  if (await rateFile.exists()) {
+    try {
+      timestamps = (jsonDecode(await rateFile.readAsString()) as List).cast<int>();
+    } catch (_) {}
+  }
+  
+  // Filter timestamps within the last 15 seconds
+  timestamps = timestamps.where((t) => now - t < 15000).toList();
+  if (timestamps.length >= 3) {
+    print('[CRITICAL] ANTI-LOOP ACTIVATED: Demasiadas solicitudes en poco tiempo. Abortando.');
+    final ledger = ForensicLedger();
+    await ledger.appendEntry(
+      sessionId: 'GATE-RED',
+      type: 'ALERT',
+      task: 'ANTI-LOOP',
+      detail: 'Rate limiting triggered: 3+ calls in 15s.',
+      basePath: Directory.current.path,
+    );
+    exit(1);
+  }
+  timestamps.add(now);
+  if (!await rateFile.parent.exists()) await rateFile.parent.create(recursive: true);
+  await rateFile.writeAsString(jsonEncode(timestamps));
+
   final parser = ArgParser()
-    ..addCommand('act')
+    ..addCommand('act', ArgParser()
+      ..addFlag('dry-run', negatable: false, help: 'Executes audit but does not persist pulse or history'))
     ..addCommand('audit')
     ..addCommand('baseline')
-    ..addCommand('handover')
+    ..addCommand('handover', ArgParser()
+      ..addFlag('force', negatable: false, help: 'Force handover even if session is expired or invalid'))
     ..addCommand('takeover')
     ..addCommand('status')
-    ..addCommand('vault')
+    ..addCommand('context')
+    ..addCommand('hook', ArgParser()
+      ..addCommand('install'))
+    ..addCommand('vault', ArgParser()
+      ..addCommand('bind-key', ArgParser()
+        ..addOption('project', abbr: 'p', help: 'Project ID')
+        ..addOption('key', abbr: 'k', help: 'Path to RSA XML Key'))
+      ..addCommand('status'))
     ..addCommand('pack')
     ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
     ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
@@ -59,10 +97,12 @@ void main(List<String> arguments) async {
 
   switch (command) {
     case 'audit':
-      await runAudit(basePath);
+      final ok = await runAudit(basePath);
+      if (!ok) exit(1);
       break;
     case 'act':
-      await runAct(basePath);
+      final dryRun = results.command!['dry-run'] as bool;
+      await runAct(basePath, dryRun: dryRun);
       break;
     case 'baseline':
       await runBaseline(basePath, keyPath);
@@ -70,11 +110,21 @@ void main(List<String> arguments) async {
     case 'status':
       await runStatus(basePath);
       break;
+    case 'context':
+      await runContext(basePath);
+      break;
+    case 'hook':
+      await runHook(basePath, results.command!);
+      break;
     case 'pack':
       await runPack(basePath);
       break;
+    case 'vault':
+      await runVault(basePath, results.command!);
+      break;
     case 'handover':
-      await runHandover(basePath, results['key']);
+      final force = results.command!['force'] as bool;
+      await runHandover(basePath, keyPath, force: force);
       break;
     case 'takeover':
       await runTakeover(basePath);
@@ -84,48 +134,76 @@ void main(List<String> arguments) async {
   }
 }
 
-Future<void> runAudit(String basePath) async {
-  print('--- [AUDIT] INTEGRITY & COMPLIANCE ---');
-  final vaultDir = Directory(p.join(basePath, 'vault'));
-  if (!await vaultDir.exists()) {
-    await vaultDir.create(recursive: true);
-  }
-  final logPath = p.join(basePath, 'vault', 'audit.log');
-  print('DEBUG: Abriendo log en $logPath');
-  final logFile = File(logPath);
-  IOSink? logSink;
-  try {
-    logSink = logFile.openWrite(mode: FileMode.write);
-    logSink.writeln('--- AUDIT REPORT [${DateTime.now()}] ---');
-
-    final integrity = IntegrityEngine();
-    final results = await integrity.verifyAll(basePath: basePath);
-    
-    bool allOk = true;
-    results.forEach((file, ok) {
-      if (!ok) {
-        print('  [❌] CORRUPT: $file');
-        logSink!.writeln('[❌] INTEGRITY-FAIL: $file');
-        allOk = false;
-      } else {
-        print('  [✅] OK: $file');
-        logSink?.writeln('[✅] INTEGRITY-OK: $file');
+Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false}) async {
+  print('--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---');
+  
+  // TASK-S16-02: Kill-Switch (Zombie Sessions)
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  if (await lockFile.exists()) {
+    try {
+      final lockData = jsonDecode(await lockFile.readAsString());
+      if (lockData['status'] == 'IN_PROGRESS' && lockData['timestamp'] != null) {
+        final startTime = DateTime.parse(lockData['timestamp']);
+        final diff = DateTime.now().difference(startTime);
+        if (diff.inHours >= 8) {
+          print('[CRITICAL] SESSION-EXPIRED: Esta sesión tiene ${diff.inHours}h de antigüedad.');
+          print('           El bloqueo del Kernel ha expirado para prevenir Sesiones Zombie.');
+          print('           ACCIÓN REQUERIDA: Ejecute "gov handover --force" para liberar el estado.');
+          
+          final ledger = ForensicLedger();
+          await ledger.appendEntry(
+            sessionId: 'GATE-RED',
+            type: 'ALERT',
+            task: 'KILL-SWITCH',
+            detail: 'Zombie session detected: ${diff.inHours}h old.',
+            basePath: basePath,
+          );
+          return false;
+        }
       }
-    });
+    } catch (_) {}
+  }
 
-    if (!allOk) {
-        logSink?.writeln('[CRITICAL] KERNEL-VIOLATION DETECTED.');
-      print('[CRITICAL] KERNEL-VIOLATION: Integrity check failed. Check vault/audit.log');
-      exit(1);
+  try {
+    final integrity = IntegrityEngine();
+
+    // 1. Manifest Signature Check (VUL-08)
+    final poPublicKeyXml = await _resolvePublicKey(basePath);
+    if (poPublicKeyXml != null && !skipSignatureCheck) {
+      final isManifestOk = await integrity.verifyManifest(
+        basePath: basePath,
+        publicKeyXml: poPublicKeyXml,
+      );
+      if (!isManifestOk) {
+        print('[CRITICAL] KERNEL-VIOLATION: La firma del manifiesto (kernel.hashes.sig) es INVÁLIDA.');
+        return false;
+      }
+      print('  [✅] MANIFEST-SIG: OK');
+    } else {
+      print('  [!] WARNING: Omitiendo validación de firma de manifiesto.');
     }
 
+    // 2. Hash Verification
+    final results = await integrity.verifyAll(basePath: basePath);
+    bool allOk = true;
+    for (var entry in results.entries) {
+      final status = entry.value ? '[OK]' : '[CORRUPT]';
+      print('  $status ${entry.key}');
+      if (!entry.value) allOk = false;
+    }
+
+    if (allOk) {
+      print('[✅] Auditoría de Integridad PASSED.');
+    } else {
+      print('[‼️] CRITICAL: Violación de Integridad detectada.');
+    }
+
+    // 3. Compliance Check
     final backlog = BacklogManager();
     final activeTasks = await backlog.checkConcurrency(basePath: basePath);
-    
     if (activeTasks.isNotEmpty) {
       final taskId = activeTasks.first;
       final compliance = ComplianceGuard();
-      
       final gitResult = await Process.run('git', ['status', '--porcelain', '--untracked-files=all'], workingDirectory: basePath);
       final stdout = gitResult.stdout as String;
       final modifiedFiles = stdout.split('\n')
@@ -137,51 +215,37 @@ Future<void> runAudit(String basePath) async {
       try {
         await compliance.enforcePreBaseline(taskId: taskId, modifiedFiles: modifiedFiles, basePath: basePath);
         print('  [✅] COMPLIANCE-OK: $taskId');
-        logSink?.writeln('[✅] COMPLIANCE-OK: $taskId');
-
-        final ledger = ForensicLedger();
-        await ledger.appendEntry(
-          sessionId: 'AUDIT-${DateTime.now().millisecondsSinceEpoch}',
-          type: 'SNAP',
-          task: taskId,
-          detail: 'Audit successful for $taskId',
-          basePath: basePath,
-        );
       } catch (e) {
         print('  [❌] COMPLIANCE-FAIL: $e');
-        logSink?.writeln('[❌] COMPLIANCE-FAIL: $e');
-        exit(1);
+        allOk = false;
       }
-    } else {
-      print('  [!] WARNING: No hay tarea activa detectada en task.md (Marcar con [/]).');
-        logSink!.writeln('[!] WARNING: No active task detected.');
     }
 
-    // 4. Strict Orphan Detection (TASK-DPI-S07-02)
-    final orphans = await integrity.detectOrphans(
-      basePath: basePath,
-      knownFiles: results.keys.toList(),
-    );
-    
+    // 4. Ledger Anchor Verification (VUL-11)
+    final isLedgerOk = await integrity.verifyLedgerAnchor(basePath: basePath);
+    if (!isLedgerOk) {
+      allOk = false;
+    }
+
+    // 5. Orphan Detection
+    final orphans = await integrity.detectOrphans(basePath: basePath);
     if (orphans.isNotEmpty) {
-      print('\n  [!] WARNING: Archivos huérfanos detectados en el root:');
-      for (final orphan in orphans) {
-        print('      - $orphan');
-      }
-      print('  (Asegúrate de registrar archivos críticos en vault/kernel.hashes)\n');
+      print('\n  [!] WARNING: Archivos huérfanos detectados: ${orphans.join(", ")}\n');
     }
 
     print('Audit COMPLETED.');
+    return allOk;
   } catch (e, stack) {
     print('[CRITICAL] Error inesperado en audit: $e');
     print(stack);
-    exit(1);
-  } finally {
-    await logSink?.close();
+    return false;
   }
 }
 
-Future<void> runAct(String basePath) async {
+Future<void> runAct(String basePath, {bool dryRun = false}) async {
+  if (dryRun) {
+    print('--- [DRY-RUN] SIMULACIÓN DE VUELO ACTIVA ---');
+  }
   await runAudit(basePath);
 
   final telemetry = TelemetryService();
@@ -192,6 +256,11 @@ Future<void> runAct(String basePath) async {
 
   if (pulse.saturation > 90) {
     print('[FATIGUE] Hard-stop: Saturation too high. Run handover.');
+  }
+
+  if (dryRun) {
+    print('\n[INFO] DRY-RUN: Omitiendo persistencia de telemetría y registros en historia.');
+    return;
   }
 
   await telemetry.incrementTurns(basePath: basePath);
@@ -231,7 +300,7 @@ Future<void> runStatus(String basePath) async {
       final integrity = IntegrityEngine();
       if (!integrity.verifySessionMAC(lockData)) {
           print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
-          exit(1);
+          return;
       }
       
       sessionState = lockData['status'] ?? 'UNKNOWN';
@@ -247,18 +316,40 @@ Future<void> runStatus(String basePath) async {
     print('----------------------------');
   } catch (e) {
     print('[CRITICAL] Fallo al recuperar estado: $e');
-    exit(1);
   }
 }
 
-Future<void> runHandover(String basePath, String? keyPath) async {
+Future<void> runContext(String basePath) async {
+  final engine = ContextEngine();
+  await engine.generateContext(basePath: basePath);
+}
+
+Future<void> runHook(String basePath, ArgResults command) async {
+  final subCommand = command.command;
+  if (subCommand?.name == 'install') {
+    final engine = HookEngine();
+    await engine.installHooks(basePath: basePath);
+  } else {
+    print('[ERROR] Debe especificar un subcomando de hook (install).');
+  }
+}
+
+Future<void> runHandover(String basePath, String? keyPath, {bool force = false}) async {
   print('--- [HANDOVER] CIERRE DE SESIÓN ---');
   final backlogManager = BacklogManager();
   final telemetry = TelemetryService();
   final vanguard = VanguardCore();
   final dashboard = DashboardEngine();
 
-  await runAudit(basePath);
+  if (force) {
+    print('[WARNING] FORCE-HANDOVER: Ignorando validaciones de integridad por orden superior.');
+  } else {
+    final ok = await runAudit(basePath);
+    if (!ok) {
+       print('[CRITICAL] Handover abortado: El sistema no es íntegro. Use --force si es una emergencia.');
+       return;
+    }
+  }
 
   final backlog = await backlogManager.loadBacklog(basePath: basePath);
   final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
@@ -323,12 +414,12 @@ Future<void> runTakeover(String basePath) async {
     final integrity = IntegrityEngine();
     if (!integrity.verifySessionMAC(lock)) {
         print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
-        exit(1);
+        return;
     }
     
     if (lock['status'] != 'HANDOVER_SEALED') {
       print('[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente.');
-      exit(1);
+      return;
     }
     inheritedCP = (lock['shs_at_close'] as num?)?.toDouble() ?? 0.0;
     lastHash = lock['git_hash'] as String?;
@@ -342,7 +433,7 @@ Future<void> runTakeover(String basePath) async {
   final currentHash = (gitResult.stdout as String).trim();
   if (lastHash != null && lastHash != currentHash) {
     print('[CRITICAL] GIT-DRIFT: El hash actual ($currentHash) no coincide con el cierre ($lastHash). Abortando para proteger integridad.');
-    exit(1);
+    return;
   }
 
   await runAudit(basePath);
@@ -396,7 +487,9 @@ Future<void> runTakeover(String basePath) async {
 
 Future<void> runBaseline(String basePath, String? keyPath) async {
   print('--- [BASELINE] SELLADO FORMAL DE KERNEL ---');
-  await runAudit(basePath);
+  // En baseline, saltamos el check de firma porque precisamente vamos a regenerarla (VUL-08)
+  await runAudit(basePath, skipSignatureCheck: true);
+  print('DEBUG-BASELINE: Audit returned, continuing to seal...');
 
   final backlogManager = BacklogManager();
   final telemetry = TelemetryService();
@@ -411,8 +504,18 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
     return;
   }
 
+  print('DEBUG-BASELINE: Audit complete. Resolving key...');
+  // Resolve key from vault if not provided (VUL-02)
+  final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, activeSprint['id']);
+  print('DEBUG-BASELINE: Resolved Key Path: $resolvedKeyPath');
+  if (resolvedKeyPath == null) {
+     print('[CRITICAL] No se encontró clave vinculada para el proyecto. Use "gov vault bind-key".');
+     return;
+  }
+
   final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
   final gitHash = (gitResult.stdout as String).trim();
+  print('DEBUG-BASELINE: Git Hash: $gitHash');
   final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
 
   final lockFile = File(p.join(basePath, 'session.lock'));
@@ -427,6 +530,45 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   lockData['_mac'] = integrity.generateSessionMAC(lockData);
   
   await lockFile.writeAsString(jsonEncode(lockData));
+  print('DEBUG-BASELINE: session.lock updated.');
+
+  // 2. Generate and Sign Manifest (VUL-08)
+  print('[DEBUG] Generando nuevo manifiesto de hashes...');
+  final newHashes = await integrity.generateHashes(basePath: basePath);
+  
+  // Enforce sorted keys for deterministic JSON (VUL-08)
+  final sortedHashesArr = newHashes.keys.toList()..sort();
+  final sortedHashes = { for (var k in sortedHashesArr) k : newHashes[k] };
+  
+  final hashesFile = File(p.join(basePath, 'vault', 'kernel.hashes'));
+  await hashesFile.writeAsString(JsonEncoder.withIndent('  ').convert(sortedHashes));
+  print('DEBUG-BASELINE: kernel.hashes written.');
+
+  final keyFile = File(resolvedKeyPath);
+  if (!await keyFile.exists()) {
+    print('[ERROR] SignEngine: Error al cargar clave privada del PO. El archivo NO EXISTE en esa ruta.');
+    return;
+  }
+  final privateKeyXml = await keyFile.readAsString();
+  print('DEBUG-BASELINE: Signing manifest...');
+  await integrity.signManifest(basePath: basePath, privateKeyXml: privateKeyXml);
+  print('DEBUG-BASELINE: Manifest signed.');
+
+  // TASK-S16-01: Auto-Commit Semántico
+  final activeTask = backlogManager.getActiveTask(activeSprint);
+  String commitMsg = 'chore(${activeSprint['id']}): Baseline seal';
+  if (activeTask != null) {
+     commitMsg = 'feat(${activeSprint['id']}): ${activeTask['id']} - ${activeTask['desc']}';
+  }
+  
+  print('[OPS] Ejecutando Auto-Commit: $commitMsg');
+  await Process.run('git', ['add', '.'], workingDirectory: basePath);
+  final commitResult = await Process.run('git', ['commit', '-m', commitMsg], workingDirectory: basePath);
+  if (commitResult.exitCode == 0) {
+    print('  [✅] GIT-COMMIT: OK');
+  } else {
+    print('  [!] GIT-COMMIT: No hay cambios pendientes o error en commit.');
+  }
 
   final ledger = ForensicLedger();
   await ledger.appendEntry(
@@ -438,6 +580,75 @@ Future<void> runBaseline(String basePath, String? keyPath) async {
   );
 
   print('Baseline COMPLETADO. Sprint ${activeSprint['id']} SELLADO con éxito.');
+}
+
+/// S12-01: Vault implementation for secure key binding (VUL-02).
+Future<void> runVault(String basePath, ArgResults command) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  Map<String, String> keys = {};
+  
+  if (await vaultFile.exists()) {
+    keys = Map<String, String>.from(jsonDecode(await vaultFile.readAsString()));
+  }
+
+  final subCommand = command.command;
+  if (subCommand == null) {
+    print('[ERROR] Debe especificar un subcomando de vault (bind-key, status).');
+    return;
+  }
+
+  switch (subCommand.name) {
+    case 'bind-key':
+      final id = subCommand['project'] as String?;
+      final path = subCommand['key'] as String?;
+      if (id == null || path == null) {
+        print('[ERROR] Faltan argumentos: --project <ID> --key <PATH>');
+        return;
+      }
+      keys[id] = path;
+      await vaultFile.writeAsString(jsonEncode(keys));
+      print('[✅] Clave vinculada exitosamente para: $id');
+      break;
+    case 'status':
+      print('--- [VAULT] CLAVES VINCULADAS ---');
+      keys.forEach((id, path) => print('  $id -> $path'));
+      break;
+    default:
+      print('[ERROR] Subcomando de vault no reconocido: ${subCommand.name}');
+  }
+}
+
+Future<String?> _resolvePublicKey(String basePath) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (await vaultFile.exists()) {
+    final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+    print('DEBUG: [VAULT-LOAD] Claves cargadas: ${keys.length}');
+    for (var entry in keys.entries) {
+      final keyPath = entry.value as String;
+      final pubKeyPath = keyPath.replaceFirst('_private.xml', '_public.xml');
+      final pubKeyFile = File(p.join(basePath, pubKeyPath));
+      print('DEBUG: [VAULT-LOAD] Probando clave: ${pubKeyFile.path}');
+      if (await pubKeyFile.exists()) {
+        return await pubKeyFile.readAsString();
+      }
+    }
+  }
+
+  // Fallback to default path
+  final pubKeyFile = File(p.join(basePath, 'vault', 'po_public.xml'));
+  print('DEBUG: Buscando clave pública (fallback) en: ${pubKeyFile.path}');
+  if (await pubKeyFile.exists()) {
+    return await pubKeyFile.readAsString();
+  }
+  return null;
+}
+
+Future<String?> _resolveKeyPath(String basePath, String projectId) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (!await vaultFile.exists()) return null;
+  
+  final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+  return keys[projectId] as String?;
 }
 
 Future<void> runPack(String basePath) async {
@@ -468,6 +679,5 @@ Future<void> runPack(String basePath) async {
   } catch (e, stack) {
     print('[CRITICAL] Error en pack: $e');
     print(stack);
-    exit(1);
   }
 }

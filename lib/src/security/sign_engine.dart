@@ -1,116 +1,112 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:crypto/crypto.dart';
+import 'package:xml/xml.dart';
 import 'package:pointycastle/export.dart';
-import 'package:path/path.dart' as p;
 
-/// SignEngine: Native RSA signing and verification (replaces sign_challenge.ps1).
-/// Supports .NET RSA XML key format.
+/// SignEngine: Manages RSA signing and verification for governance events.
+/// (S12-01: Hardened with package:xml for VUL-01 and PointyCastle for RSA)
 class SignEngine {
-  /// Signs a challenge using a private key from an XML file.
-  Future<String> sign({
-    required String challenge,
-    required String files,
-    required String privateKeyXmlPath,
+  /// Signs a challenge using a private key (XML format).
+  Future<Uint8List> sign({
+    required Uint8List challenge,
+    required String privateKeyXml,
   }) async {
-    final file = File(privateKeyXmlPath);
-    if (!await file.exists()) throw Exception('Private key not found at $privateKeyXmlPath');
+    final params = _parseRsaXml(privateKeyXml);
+    final n = _bytesToBigInt(params['Modulus']!);
+    final d = _bytesToBigInt(params['D']!);
     
-    final xml = await file.readAsString();
-    final privateKey = _parsePrivateKeyXml(xml);
+    final pBytes = params['P'];
+    final p = pBytes != null ? _bytesToBigInt(pBytes) : null;
+    
+    final qBytes = params['Q'];
+    final q = qBytes != null ? _bytesToBigInt(qBytes) : null;
 
+    final privateKey = RSAPrivateKey(n, d, p, q);
     final signer = RSASigner(SHA256Digest(), '0609608648016503040201'); // OID for SHA-256
     signer.init(true, PrivateKeyParameter<RSAPrivateKey>(privateKey));
 
-    final contextString = '$challenge:$files';
-    final data = Uint8List.fromList(utf8.encode(contextString));
+    final signature = signer.generateSignature(challenge);
     
-    try {
-      final signature = signer.generateSignature(data);
-      return base64Encode(signature.bytes);
-    } finally {
-      _zeroOut(data);
-    }
+    // VUL-03: Zero out ALL sensitive buffers after use
+    params.values.forEach(_zeroOut);
+    
+    return signature.bytes;
   }
 
-  /// Verifies a signature using a public key from an XML file.
+  /// Verifies a signature against a challenge using a public key (XML format).
   Future<bool> verify({
-    required String challenge,
-    required String files,
-    required String signatureBase64,
-    required String publicKeyXmlPath,
+    required Uint8List challenge,
+    required Uint8List signature,
+    required String publicKeyXml,
   }) async {
-    final file = File(publicKeyXmlPath);
-    if (!await file.exists()) return false;
-
-    final xml = await file.readAsString();
-    final publicKey = _parsePublicKeyXml(xml);
-
-    final signer = RSASigner(SHA256Digest(), '0609608648016503040201');
-    signer.init(false, PublicKeyParameter<RSAPublicKey>(publicKey));
-
-    final contextString = '$challenge:$files';
-    final data = Uint8List.fromList(utf8.encode(contextString));
-    final signatureBytes = Uint8List.fromList(base64Decode(signatureBase64));
-
     try {
-      final isValid = signer.verifySignature(
-        data,
-        RSASignature(signatureBytes),
-      );
-      return isValid;
-    } on ArgumentError catch (e) {
-      print('[SIGN-ENGINE] Error de formato en firma: $e');
-      return false;
-    } catch (e) {
-      print('[SIGN-ENGINE] Error inesperado en verificación: $e');
-      rethrow;
-    } finally {
-      _zeroOut(data);
-      _zeroOut(signatureBytes);
-    }
-  }
+      final params = _parseRsaXml(publicKeyXml);
+      final n = _bytesToBigInt(params['Modulus']!);
+      final e = _bytesToBigInt(params['Exponent']!);
 
-  void _zeroOut(Uint8List? list) {
-    if (list != null) {
-      for (var i = 0; i < list.length; i++) {
-        list[i] = 0;
+      final publicKey = RSAPublicKey(n, e);
+      final verifier = RSASigner(SHA256Digest(), '0609608648016503040201');
+      verifier.init(false, PublicKeyParameter<RSAPublicKey>(publicKey));
+
+      try {
+        final isValid = verifier.verifySignature(challenge, RSASignature(signature));
+        // VUL-03: Clean up public params too (good hygiene)
+        params.values.forEach(_zeroOut);
+        return isValid;
+      } catch (e) {
+        // VUL-04: Specific handling for verification failure vs system error
+        stderr.writeln('[DEBUG] SignEngine.verify: Signature check rejected ($e)');
+        return false;
       }
+    } catch (e) {
+      // VUL-04: Critical error during parsing or engine init
+      stderr.writeln('[ERROR] SignEngine.verify: Critical failure in verification pipeline.');
+      stderr.writeln('  Detail: $e');
+      rethrow;
     }
   }
 
-  RSAPrivateKey _parsePrivateKeyXml(String xml) {
-    BigInt modulus = _getXmlBigInt(xml, 'Modulus');
-    BigInt exponent = _getXmlBigInt(xml, 'Exponent');
-    BigInt p = _getXmlBigInt(xml, 'P');
-    BigInt q = _getXmlBigInt(xml, 'Q');
-    BigInt d = _getXmlBigInt(xml, 'D');
-
-    return RSAPrivateKey(modulus, d, p, q);
-  }
-
-  RSAPublicKey _parsePublicKeyXml(String xml) {
-    BigInt modulus = _getXmlBigInt(xml, 'Modulus');
-    BigInt exponent = _getXmlBigInt(xml, 'Exponent');
-
-    return RSAPublicKey(modulus, exponent);
-  }
-
-  BigInt _getXmlBigInt(String xml, String tag) {
-    // Mejora de robustez: Soporte multi-línea y espacios
-    final match = RegExp('<$tag>(.*?)</$tag>', dotAll: true).firstMatch(xml);
-    if (match == null) throw Exception('RSA XML missing tag: $tag');
-    final b64 = match.group(1)!.replaceAll(RegExp(r'\s+'), '');
-    final bytes = base64Decode(b64);
-    return _decodeBigInt(bytes);
-  }
-
-  BigInt _decodeBigInt(List<int> bytes) {
+  /// Converts Uint8List to BigInt (unsigned).
+  BigInt _bytesToBigInt(Uint8List bytes) {
     BigInt result = BigInt.from(0);
-    for (int byte in bytes) {
-      result = (result << 8) | BigInt.from(byte & 0xff);
+    for (int i = 0; i < bytes.length; i++) {
+      result = (result << 8) | BigInt.from(bytes[i]);
     }
     return result;
+  }
+
+  /// Robust RSA XML Parser using package:xml (VUL-01).
+  Map<String, Uint8List> _parseRsaXml(String xmlData) {
+    final Map<String, Uint8List> params = {};
+    try {
+      final document = XmlDocument.parse(xmlData);
+      final root = document.rootElement;
+      
+      for (final node in root.children) {
+        if (node is XmlElement) {
+          final name = node.name.local;
+          final value = node.innerText.trim()
+              .replaceAll('\n', '')
+              .replaceAll('\r', '')
+              .replaceAll(' ', '');
+          params[name] = base64Decode(value);
+        }
+      }
+    } catch (e) {
+      throw Exception('Fallo al parsear clave RSA XML: Formato inválido o corrupto ($e)');
+    }
+    
+    // Ensure critical components exist
+    if (!params.containsKey('Modulus')) throw Exception('Clave RSA inválida: Falta Modulus');
+    
+    return params;
+  }
+
+  /// Cleanly zeroes out memory for sensitive data (VUL-03).
+  void _zeroOut(Uint8List buffer) {
+    for (int i = 0; i < buffer.length; i++) {
+      buffer[i] = 0;
+    }
   }
 }

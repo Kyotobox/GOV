@@ -1,0 +1,1966 @@
+=== AI CONTEXT GENERATED: 2026-03-27 01:48:22.996115 ===
+TASK_ID: TASK-DPI-S15-01
+================================================
+
+FILE: bin/antigravity_dpi.dart
+--- CONTENT START ---
+import 'dart:io';
+import 'dart:convert';
+import 'package:args/args.dart';
+import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
+import 'package:antigravity_dpi/src/security/integrity_engine.dart';
+import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
+import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
+import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
+import 'package:antigravity_dpi/src/security/vanguard_core.dart';
+import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
+import 'package:antigravity_dpi/src/core/pack_engine.dart';
+import 'package:antigravity_dpi/src/core/context_engine.dart';
+import 'package:path/path.dart' as p;
+
+const String version = '1.0.0';
+
+void main(List<String> arguments) async {
+  final integrityEngine = IntegrityEngine();
+  final isSelfIntact = await integrityEngine.verifySelf(
+    toolRoot: Directory.current.path,
+  );
+  if (!isSelfIntact) {
+    print('[CRITICAL] SELF-AUDIT FAILED: El código fuente de la herramienta ha sido alterado. Operación abortada.');
+    exit(2);
+  }
+
+  final parser = ArgParser()
+    ..addCommand('act')
+    ..addCommand('audit')
+    ..addCommand('baseline')
+    ..addCommand('handover')
+    ..addCommand('takeover')
+    ..addCommand('status')
+    ..addCommand('context')
+    ..addCommand('vault', ArgParser()
+      ..addCommand('bind-key', ArgParser()
+        ..addOption('project', abbr: 'p', help: 'Project ID')
+        ..addOption('key', abbr: 'k', help: 'Path to RSA XML Key'))
+      ..addCommand('status'))
+    ..addCommand('pack')
+    ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
+    ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
+
+  final ArgResults results;
+  try {
+    results = parser.parse(arguments);
+  } catch (e) {
+    print('Error: ${e.toString()}');
+    return;
+  }
+
+  var basePath = (results['path'] ?? Directory.current.path) as String;
+  basePath = basePath.replaceAll('"', '').trim();
+  final keyPath = results['key'] as String?;
+  final command = results.command?.name;
+
+  if (command == null) {
+    print('antigravity_dpi v$version - Governance Control Plane');
+    print(parser.usage);
+    return;
+  }
+
+  print('[GOV] Executing command: $command');
+
+  switch (command) {
+    case 'audit':
+      final ok = await runAudit(basePath);
+      if (!ok) exit(1);
+      break;
+    case 'act':
+      await runAct(basePath);
+      break;
+    case 'baseline':
+      await runBaseline(basePath, keyPath);
+      break;
+    case 'status':
+      await runStatus(basePath);
+      break;
+    case 'context':
+      await runContext(basePath);
+      break;
+    case 'pack':
+      await runPack(basePath);
+      break;
+    case 'vault':
+      await runVault(basePath, results.command!);
+      break;
+    case 'handover':
+      await runHandover(basePath, keyPath);
+      break;
+    case 'takeover':
+      await runTakeover(basePath);
+      break;
+    default:
+      print('Command not implemented: $command');
+  }
+}
+
+Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false}) async {
+  print('--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---');
+  try {
+    final integrity = IntegrityEngine();
+
+    // 1. Manifest Signature Check (VUL-08)
+    final poPublicKeyXml = await _resolvePublicKey(basePath);
+    if (poPublicKeyXml != null && !skipSignatureCheck) {
+      final isManifestOk = await integrity.verifyManifest(
+        basePath: basePath,
+        publicKeyXml: poPublicKeyXml,
+      );
+      if (!isManifestOk) {
+        print('[CRITICAL] KERNEL-VIOLATION: La firma del manifiesto (kernel.hashes.sig) es INVÁLIDA.');
+        return false;
+      }
+      print('  [✅] MANIFEST-SIG: OK');
+    } else {
+      print('  [!] WARNING: Omitiendo validación de firma de manifiesto.');
+    }
+
+    // 2. Hash Verification
+    final results = await integrity.verifyAll(basePath: basePath);
+    bool allOk = true;
+    for (var entry in results.entries) {
+      final status = entry.value ? '[OK]' : '[CORRUPT]';
+      print('  $status ${entry.key}');
+      if (!entry.value) allOk = false;
+    }
+
+    if (allOk) {
+      print('[✅] Auditoría de Integridad PASSED.');
+    } else {
+      print('[‼️] CRITICAL: Violación de Integridad detectada.');
+    }
+
+    // 3. Compliance Check
+    final backlog = BacklogManager();
+    final activeTasks = await backlog.checkConcurrency(basePath: basePath);
+    if (activeTasks.isNotEmpty) {
+      final taskId = activeTasks.first;
+      final compliance = ComplianceGuard();
+      final gitResult = await Process.run('git', ['status', '--porcelain', '--untracked-files=all'], workingDirectory: basePath);
+      final stdout = gitResult.stdout as String;
+      final modifiedFiles = stdout.split('\n')
+          .where((l) => l.length >= 3)
+          .map((l) => l.substring(3).trim())
+          .where((f) => f.isNotEmpty)
+          .toList();
+
+      try {
+        await compliance.enforcePreBaseline(taskId: taskId, modifiedFiles: modifiedFiles, basePath: basePath);
+        print('  [✅] COMPLIANCE-OK: $taskId');
+      } catch (e) {
+        print('  [❌] COMPLIANCE-FAIL: $e');
+        allOk = false;
+      }
+    }
+
+    // 4. Ledger Anchor Verification (VUL-11)
+    final isLedgerOk = await integrity.verifyLedgerAnchor(basePath: basePath);
+    if (!isLedgerOk) {
+      allOk = false;
+    }
+
+    // 5. Orphan Detection
+    final orphans = await integrity.detectOrphans(basePath: basePath);
+    if (orphans.isNotEmpty) {
+      print('\n  [!] WARNING: Archivos huérfanos detectados: ${orphans.join(", ")}\n');
+    }
+
+    print('Audit COMPLETED.');
+    return allOk;
+  } catch (e, stack) {
+    print('[CRITICAL] Error inesperado en audit: $e');
+    print(stack);
+    return false;
+  }
+}
+
+Future<void> runAct(String basePath) async {
+  await runAudit(basePath);
+
+  final telemetry = TelemetryService();
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  print('--- [TELEMETRY] PULSE ---');
+  print('Saturation: ${pulse.saturation}% | CP: ${pulse.cp}');
+
+  if (pulse.saturation > 90) {
+    print('[FATIGUE] Hard-stop: Saturation too high. Run handover.');
+  }
+
+  await telemetry.incrementTurns(basePath: basePath);
+  await telemetry.persistPulse(pulse, basePath: basePath);
+
+  final backlogManager = BacklogManager();
+  final activeTasks = await backlogManager.checkConcurrency(basePath: basePath);
+  final ledger = ForensicLedger();
+  
+  final taskId = activeTasks.isNotEmpty ? activeTasks.first : 'S06-GENERAL';
+  
+  try {
+    await ledger.appendEntry(
+      sessionId: 'ACT-${DateTime.now().millisecondsSinceEpoch}', 
+      type: 'EXEC', 
+      task: taskId, 
+      detail: 'Pulse: ${pulse.saturation}% sat, ${pulse.cp} CP', 
+      basePath: basePath
+    );
+    print('[✅] Pulse PERSISTIDO en historial.');
+  } catch (e) {
+    print('[⚠️] WARNING: No se pudo persistir el pulso en el historial: $e');
+  }
+}
+
+Future<void> runStatus(String basePath) async {
+  try {
+    final telemetry = TelemetryService();
+    final lockFile = File(p.join(basePath, 'session.lock'));
+    
+    double carryOver = 0.0;
+    String sessionState = 'UNKNOWN';
+    
+    if (await lockFile.exists()) {
+      final lockData = jsonDecode(await lockFile.readAsString());
+      
+      final integrity = IntegrityEngine();
+      if (!integrity.verifySessionMAC(lockData)) {
+          print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+          return;
+      }
+      
+      sessionState = lockData['status'] ?? 'UNKNOWN';
+      carryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: carryOver);
+    
+    print('--- [GOV] PROJECT STATUS ---');
+    print('Estado Sesión: $sessionState');
+    print('Saturación:    ${pulse.saturation}%');
+    print('Puntos CP:     ${pulse.cp} (Heredado: $carryOver)');
+    print('----------------------------');
+  } catch (e) {
+    print('[CRITICAL] Fallo al recuperar estado: $e');
+  }
+}
+
+Future<void> runContext(String basePath) async {
+  final engine = ContextEngine();
+  await engine.generateContext(basePath: basePath);
+}
+
+Future<void> runHandover(String basePath, String? keyPath) async {
+  print('--- [HANDOVER] CIERRE DE SESIÓN ---');
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  final vanguard = VanguardCore();
+  final dashboard = DashboardEngine();
+
+  await runAudit(basePath);
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  await vanguard.issueChallenge(
+    level: 'TACTICAL',
+    project: backlog['project'] ?? 'UNKNOWN',
+    files: ['session.lock', 'intel_pulse.json'],
+    basePath: basePath,
+  );
+
+  final signed = await vanguard.waitForSignature(basePath: basePath);
+  if (!signed) {
+    print('[CRITICAL] Handover abortado: Se requiere firma del PO.');
+    return;
+  }
+
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final gitHash = (gitResult.stdout as String).trim();
+
+  final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
+  
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  final lockData = {
+    'status': 'HANDOVER_SEALED',
+    'timestamp': timestamp,
+    'shs_at_close': pulse.saturation,
+    'git_hash': gitHash,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+
+  await telemetry.resetCounters(basePath: basePath);
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint?['id'] ?? 'S04-GENERAL',
+    type: 'SNAP',
+    task: 'HANDOVER',
+    detail: 'Handover completed. SHS: ${pulse.saturation}%. Git: $gitHash',
+    basePath: basePath,
+  );
+
+  print('Handover COMPLETADO. Sesión SELLADA.');
+}
+
+Future<void> runTakeover(String basePath) async {
+  print('--- [TAKEOVER] RECUPERACIÓN DE SESIÓN ---');
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  double inheritedCP = 0.0;
+  String? lastHash;
+  
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  if (lockFile.existsSync()) {
+    final lock = jsonDecode(await lockFile.readAsString());
+    
+    final integrity = IntegrityEngine();
+    if (!integrity.verifySessionMAC(lock)) {
+        print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+        return;
+    }
+    
+    if (lock['status'] != 'HANDOVER_SEALED') {
+      print('[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente.');
+      return;
+    }
+    inheritedCP = (lock['shs_at_close'] as num?)?.toDouble() ?? 0.0;
+    lastHash = lock['git_hash'] as String?;
+  }
+
+  // ALIGNMENT: Ensure we are on master to avoid detached HEAD drift
+  await Process.run('git', ['checkout', 'master'], workingDirectory: basePath);
+
+  // 2. Verificar Git Hash (HARD-STOP)
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final currentHash = (gitResult.stdout as String).trim();
+  if (lastHash != null && lastHash != currentHash) {
+    print('[CRITICAL] GIT-DRIFT: El hash actual ($currentHash) no coincide con el cierre ($lastHash). Abortando para proteger integridad.');
+    return;
+  }
+
+  await runAudit(basePath);
+
+  final lockData = {
+    'status': 'IN_PROGRESS',
+    'timestamp': DateTime.now().toIso8601String(),
+    'inherited_fatigue': inheritedCP,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+
+  // 3. Búsqueda de Tarea Objetivo
+  String targetTask = 'S04-GENERAL';
+  if (activeSprint != null) {
+    final tasks = activeSprint['tasks'] as List?;
+    if (tasks != null) {
+      final pending = tasks.firstWhere((t) => t['status'] == 'PENDING', orElse: () => null);
+      if (pending != null) {
+        targetTask = pending['id'];
+      }
+    }
+  }
+
+  // 4. Cálculo de Pulso Real
+  final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: inheritedCP);
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint?['id'] ?? 'S04-GENERAL',
+    type: 'SNAP',
+    task: 'TAKEOVER',
+    detail: 'Takeover success. Inherited CP: $inheritedCP',
+    basePath: basePath,
+  );
+
+  // 5. Consola Táctica
+  print('\n----------------------------------------');
+  print('  [GOV] TAKEOVER EXITOSO');
+  print('  Saturación Real: ${pulse.saturation}% (CP: ${pulse.cp})');
+  print('  Tarea Objetivo:  $targetTask');
+  print('\n[STATUS] Sesión reanudada con persistencia de fatiga heredada.');
+  print('----------------------------------------\n');
+}
+
+Future<void> runBaseline(String basePath, String? keyPath) async {
+  print('--- [BASELINE] SELLADO FORMAL DE KERNEL ---');
+  // En baseline, saltamos el check de firma porque precisamente vamos a regenerarla (VUL-08)
+  await runAudit(basePath, skipSignatureCheck: true);
+  print('DEBUG-BASELINE: Audit returned, continuing to seal...');
+
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  final vanguard = VanguardCore();
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  if (activeSprint == null) {
+    print('[CRITICAL] No se encontró sprint activo.');
+    return;
+  }
+
+  print('DEBUG-BASELINE: Audit complete. Resolving key...');
+  // Resolve key from vault if not provided (VUL-02)
+  final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, activeSprint['id']);
+  print('DEBUG-BASELINE: Resolved Key Path: $resolvedKeyPath');
+  if (resolvedKeyPath == null) {
+     print('[CRITICAL] No se encontró clave vinculada para el proyecto. Use "gov vault bind-key".');
+     return;
+  }
+
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final gitHash = (gitResult.stdout as String).trim();
+  print('DEBUG-BASELINE: Git Hash: $gitHash');
+  final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
+
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  final lockData = {
+    'status': 'BASELINE_SEALED',
+    'timestamp': timestamp,
+    'sprint_id': activeSprint['id'],
+    'git_hash': gitHash,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+  print('DEBUG-BASELINE: session.lock updated.');
+
+  // 2. Generate and Sign Manifest (VUL-08)
+  print('[DEBUG] Generando nuevo manifiesto de hashes...');
+  final newHashes = await integrity.generateHashes(basePath: basePath);
+  
+  // Enforce sorted keys for deterministic JSON (VUL-08)
+  final sortedHashesArr = newHashes.keys.toList()..sort();
+  final sortedHashes = { for (var k in sortedHashesArr) k : newHashes[k] };
+  
+  final hashesFile = File(p.join(basePath, 'vault', 'kernel.hashes'));
+  await hashesFile.writeAsString(JsonEncoder.withIndent('  ').convert(sortedHashes));
+  print('DEBUG-BASELINE: kernel.hashes written.');
+
+  final keyFile = File(resolvedKeyPath);
+  if (!await keyFile.exists()) {
+    print('[ERROR] SignEngine: Error al cargar clave privada del PO. El archivo NO EXISTE en esa ruta.');
+    return;
+  }
+  final privateKeyXml = await keyFile.readAsString();
+  print('DEBUG-BASELINE: Signing manifest...');
+  await integrity.signManifest(basePath: basePath, privateKeyXml: privateKeyXml);
+  print('DEBUG-BASELINE: Manifest signed.');
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint['id'],
+    type: 'BASE',
+    task: 'BASELINE',
+    detail: 'Baseline sealed. Git: $gitHash',
+    basePath: basePath,
+  );
+
+  print('Baseline COMPLETADO. Sprint ${activeSprint['id']} SELLADO con éxito.');
+}
+
+/// S12-01: Vault implementation for secure key binding (VUL-02).
+Future<void> runVault(String basePath, ArgResults command) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  Map<String, String> keys = {};
+  
+  if (await vaultFile.exists()) {
+    keys = Map<String, String>.from(jsonDecode(await vaultFile.readAsString()));
+  }
+
+  final subCommand = command.command;
+  if (subCommand == null) {
+    print('[ERROR] Debe especificar un subcomando de vault (bind-key, status).');
+    return;
+  }
+
+  switch (subCommand.name) {
+    case 'bind-key':
+      final id = subCommand['project'] as String?;
+      final path = subCommand['key'] as String?;
+      if (id == null || path == null) {
+        print('[ERROR] Faltan argumentos: --project <ID> --key <PATH>');
+        return;
+      }
+      keys[id] = path;
+      await vaultFile.writeAsString(jsonEncode(keys));
+      print('[✅] Clave vinculada exitosamente para: $id');
+      break;
+    case 'status':
+      print('--- [VAULT] CLAVES VINCULADAS ---');
+      keys.forEach((id, path) => print('  $id -> $path'));
+      break;
+    default:
+      print('[ERROR] Subcomando de vault no reconocido: ${subCommand.name}');
+  }
+}
+
+Future<String?> _resolvePublicKey(String basePath) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (await vaultFile.exists()) {
+    final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+    print('DEBUG: [VAULT-LOAD] Claves cargadas: ${keys.length}');
+    for (var entry in keys.entries) {
+      final keyPath = entry.value as String;
+      final pubKeyPath = keyPath.replaceFirst('_private.xml', '_public.xml');
+      final pubKeyFile = File(p.join(basePath, pubKeyPath));
+      print('DEBUG: [VAULT-LOAD] Probando clave: ${pubKeyFile.path}');
+      if (await pubKeyFile.exists()) {
+        return await pubKeyFile.readAsString();
+      }
+    }
+  }
+
+  // Fallback to default path
+  final pubKeyFile = File(p.join(basePath, 'vault', 'po_public.xml'));
+  print('DEBUG: Buscando clave pública (fallback) en: ${pubKeyFile.path}');
+  if (await pubKeyFile.exists()) {
+    return await pubKeyFile.readAsString();
+  }
+  return null;
+}
+
+Future<String?> _resolveKeyPath(String basePath, String projectId) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (!await vaultFile.exists()) return null;
+  
+  final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+  return keys[projectId] as String?;
+}
+
+Future<void> runPack(String basePath) async {
+  try {
+    print('--- [PACK] EXPORTACIÓN PARA AUDITORÍA ---');
+    
+    // 1. Mandatory Audit
+    print('[INFO] Ejecutando auditoría previa...');
+    await runAudit(basePath);
+
+    // 2. Packaging
+    final packer = PackEngine();
+    final zipPath = await packer.pack(basePath: basePath);
+
+    final ledger = ForensicLedger();
+    await ledger.appendEntry(
+      sessionId: 'PACK-${DateTime.now().millisecondsSinceEpoch}',
+      type: 'SNAP',
+      task: 'PACK',
+      detail: 'Project exported to ZIP: ${p.basename(zipPath)}',
+      basePath: basePath,
+    );
+
+    print('\n----------------------------------------');
+    print('  [GOV] EXPORTACIÓN EXITOSA');
+    print('  Archivo: $zipPath');
+    print('----------------------------------------\n');
+  } catch (e, stack) {
+    print('[CRITICAL] Error en pack: $e');
+    print(stack);
+  }
+}
+
+--- CONTENT END ---
+
+FILE: lib/src/core/context_engine.dart
+--- CONTENT START ---
+import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
+import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
+import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
+
+/// Engine to aggregate source code and governance files for AI context.
+class ContextEngine {
+  Future<void> generateContext({required String basePath}) async {
+    final backlogManager = BacklogManager();
+    final compliance = ComplianceGuard();
+    final ledger = ForensicLedger();
+
+    print('--- [CONTEXT] GENERANDO FOCO PARA IA ---');
+
+    // 1. Identificar Tarea Activa
+    final backlog = await backlogManager.loadBacklog(basePath: basePath);
+    final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+    
+    if (activeSprint == null) {
+      print('[ERROR] No hay sprint activo para determinar el scope.');
+      return;
+    }
+
+    final List? tasks = activeSprint['tasks'] as List?;
+    dynamic activeTask;
+    
+    if (tasks != null) {
+      activeTask = tasks.firstWhere(
+        (t) => t['status'] == 'IN_PROGRESS', 
+        orElse: () => tasks.firstWhere((t) => t['status'] == 'PENDING', orElse: () => null)
+      );
+    }
+
+    if (activeTask == null) {
+      print('[WARNING] No se encontró tarea activa/pendiente. Usando scope general.');
+    }
+
+    final String taskId = activeTask?['id'] ?? 'S04-GENERAL';
+    print('[INFO] Tarea detectada: $taskId');
+
+    // 2. Extraer Scope
+    List<String> scopedFiles = [];
+    try {
+      scopedFiles = await compliance.extractScopeFromMd(taskId: taskId, basePath: basePath);
+    } catch (e) {
+      print('[WARNING] Fallo al extraer scope de $taskId.md: $e');
+    }
+
+    // 3. Agregar archivos CORE obligatorios
+    final mandatory = ['DASHBOARD.md', 'GEMINI.md', 'VISION.md'];
+    final allFiles = {...scopedFiles, ...mandatory}.toList();
+
+    // 4. Agregación de Contenido
+    final outputFile = File(p.join(basePath, 'vault', 'ai_context.txt'));
+    final buffer = StringBuffer();
+    buffer.writeln('=== AI CONTEXT GENERATED: ${DateTime.now()} ===');
+    buffer.writeln('TASK_ID: $taskId');
+    buffer.writeln('================================================\n');
+
+    for (var filePath in allFiles) {
+      final file = File(p.join(basePath, filePath));
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        buffer.writeln('FILE: $filePath');
+        buffer.writeln('--- CONTENT START ---');
+        buffer.writeln(content);
+        buffer.writeln('--- CONTENT END ---\n');
+        print('  [+] Incluido: $filePath');
+      } else {
+        print('  [!] Omitido (No existe): $filePath');
+      }
+    }
+
+    await outputFile.writeAsString(buffer.toString());
+
+    // 5. Registro en Historia
+    await ledger.appendEntry(
+      sessionId: activeSprint['id'],
+      type: 'SNAP',
+      task: taskId,
+      detail: 'CONTEXT: vault/ai_context.txt generado para $taskId',
+      basePath: basePath,
+    );
+
+    print('\n[✅] Contexto exportado exitosamente a: ${outputFile.path}');
+  }
+}
+
+--- CONTENT END ---
+
+FILE: lib/src/tasks/compliance_guard.dart
+--- CONTENT START ---
+import 'dart:io';
+import 'package:path/path.dart' as p;
+
+/// ComplianceGuard: Enforces scope-lock and referential task integrity.
+class ComplianceGuard {
+  // Scope definitions migrated from Base2/ops-audit.ps1
+  static final Map<String, List<RegExp>> scopeRules = {
+    'UI': [RegExp(r'lib/.*\.dart'), RegExp(r'assets/.*')],
+    'DATA': [RegExp(r'lib/.*\.dart')],
+    'SHELL': [RegExp(r'.*\.ps1'), RegExp(r'.*\.bat'), RegExp(r'pubspec\.yaml')],
+    'GOV': [RegExp(r'ops-.*\.ps1'), RegExp(r'.*\.md'), RegExp(r'GEMINI\.md')],
+    'SEC': [RegExp(r'lib/src/security/.*'), RegExp(r'vault/.*')],
+    'PLAN': [RegExp(r'.*\.md'), RegExp(r'\.meta/.*')],
+  };
+
+  /// Archivos de sistema gestionados por gov.exe que están exentos del Scope-Lock estricto.
+  static const List<String> systemExemptions = [
+    'session.lock',
+    'backlog.json',
+    'all_hashes.json', // Diagnóstico de integridad
+    'fleet_targets.tmp', // Temporal del orquestador de flota
+    'update_self_hashes.dart', // Soporte de recertificación
+    'sync_self.dart', // Fixed name
+    'final_sync.dart',
+    'task.md',
+    'DASHBOARD.md',
+    'BASELINE.md',
+    'TASK-DPI-', // Exempt all task files
+    'pubspec.lock',
+    'SESSION_RELAY_TECH.md',
+    '.log', // Exención para archivos de traza y auditoría
+    '.tmp', // Exención para archivos temporales de orquestación
+    'vault/', // Toda la telemetría, pulsos y logs
+    'HISTORY.md',
+    'bin/', // Exención para binarios de la herramienta
+    'lib/', // Exención para código fuente de la herramienta (Self-Audit)
+    'test/', // Exención para pruebas unitarias
+  ];
+
+  /// Extracts the allowed files/patterns from the "## Scope:" section of a TASK-ID.md.
+  Future<List<String>> extractScopeFromMd({
+    required String taskId,
+    required String basePath,
+  }) async {
+    final taskFile = File(p.join(basePath, '$taskId.md'));
+    if (!await taskFile.exists()) {
+      throw ComplianceException('TASK-NOT-FOUND: $taskId.md no existe.');
+    }
+
+    final lines = await taskFile.readAsLines();
+    bool inScopeSection = false;
+    List<String> allowedPatterns = [];
+
+    for (var line in lines) {
+      if (line.trim().startsWith('## Scope')) {
+        inScopeSection = true;
+        continue;
+      }
+      if (inScopeSection && line.trim().startsWith('## ')) {
+        break; // End of section
+      }
+      if (inScopeSection && line.trim().startsWith('- ')) {
+        // Extract and normalize
+        var clean = line
+            .trim()
+            .substring(2)
+            .replaceAll('`', '')
+            .replaceAll('file:///', '')
+            .replaceAll('\\', '/');
+        
+        // Strip trailing annotations (e.g., " (Nuevo)")
+        if (clean.contains(' ')) {
+          clean = clean.split(' ').first.trim();
+        }
+
+        if (clean.isNotEmpty) {
+          allowedPatterns.add(clean);
+        }
+      }
+    }
+    return allowedPatterns;
+  }
+
+  /// Verifies that modified files match the active task's strict scope.
+  List<String> checkScopeLock({
+    required List<String> allowedScope,
+    required List<String> modifiedFiles,
+    required String basePath,
+  }) {
+    final violations = <String>[];
+    for (final file in modifiedFiles) {
+      // Normalización robusta para evitar Path Traversal (VUL-19)
+      final absBase = p.canonicalize(basePath);
+      final absFile = p.canonicalize(p.join(absBase, file));
+      
+      if (!p.isWithin(absBase, absFile) && absFile != absBase) {
+        throw ComplianceException('PATH-TRAVERSAL-DETECTED: Intento de acceder a archivo fuera de la base: $file');
+      }
+
+      String cleanFile = p.relative(absFile, from: absBase).replaceAll('\\', '/');
+      print('DEBUG: file=$file | cleanFile=$cleanFile');
+
+      final cleanFileLower = cleanFile.toLowerCase();
+
+      // 1. Verificar Exenciones del Sistema
+      bool isExempt = false;
+      for (final exempt in systemExemptions) {
+        final normalizedExempt = exempt.replaceAll('\\', '/').toLowerCase();
+        
+        if (normalizedExempt.endsWith('/')) {
+          // Exención de directorio: debe coincidir con el prefijo incluyendo el separador
+          if (cleanFileLower.startsWith(normalizedExempt)) {
+            // Permitir exenciones globales excepto para el núcleo (lib/bin) que requiere scope explícito
+            if (!cleanFileLower.startsWith('lib/') && !cleanFileLower.startsWith('bin/')) {
+              isExempt = true;
+              break;
+            }
+          }
+        } else if (normalizedExempt == 'task-dpi-') {
+          // VUL-09: Exención estricta para archivos de tarea .md
+          if (RegExp(r'^task-dpi-.*\.md$').hasMatch(cleanFileLower)) {
+            isExempt = true;
+            break;
+          }
+        } else if (normalizedExempt.startsWith('.')) {
+          // Exención por extensión
+          if (cleanFileLower.endsWith(normalizedExempt)) {
+            isExempt = true;
+            break;
+          }
+        } else if (cleanFileLower == normalizedExempt) {
+          // Coincidencia exacta
+          isExempt = true;
+          break;
+        }
+      }
+      
+      // Casos específicos de archivos de sistema que siempre son exentos
+      if (cleanFileLower == 'session.lock' || 
+          cleanFileLower == 'task.md' || 
+          cleanFileLower.startsWith('vault/')) {
+        isExempt = true;
+      }
+
+      if (isExempt) continue;
+
+      bool isAllowed = false;
+      for (var pattern in allowedScope) {
+        final normalizedPattern = pattern.replaceAll('\\', '/').toLowerCase();
+        
+        if (normalizedPattern.endsWith('/')) {
+          if (cleanFileLower.startsWith(normalizedPattern)) {
+            isAllowed = true;
+            break;
+          }
+        } else {
+          if (cleanFileLower == normalizedPattern ||
+              cleanFileLower.startsWith(normalizedPattern + '/')) {
+            isAllowed = true;
+            break;
+          }
+        }
+      }
+      if (!isAllowed) {
+        violations.add(file);
+      }
+    }
+    return violations;
+  }
+
+  /// Verifies referential integrity: TASK-ID.md must exist and have Scope/CP.
+  Future<bool> checkReferentialIntegrity({
+    required String taskId,
+    required String basePath,
+  }) async {
+    final taskFile = File(p.join(basePath, '$taskId.md'));
+    if (!await taskFile.exists()) return false;
+
+    final content = await taskFile.readAsString();
+    final hasScope = content.contains(
+      RegExp(r'^## Scope|^Scope:', multiLine: true),
+    );
+    final hasCp = content.contains(
+      RegExp(r'^\*\*CP\*\*:\s*\d+|^CP:\s*\d+', multiLine: true),
+    );
+    return hasScope && hasCp;
+  }
+
+  /// Enforces all compliance rules before allowing an operation.
+  Future<void> enforcePreBaseline({
+    required String taskId,
+    required List<String> modifiedFiles,
+    required String basePath,
+  }) async {
+    // 1. Referential Integrity First
+    final isRefOk = await checkReferentialIntegrity(
+      taskId: taskId,
+      basePath: basePath,
+    );
+    if (!isRefOk) {
+      throw ComplianceException(
+        'REFERENTIAL-FAIL: $taskId.md es inválido o no existe.',
+      );
+    }
+
+    // 2. Extract Dynamic Scope
+    final allowedScope = await extractScopeFromMd(
+      taskId: taskId,
+      basePath: basePath,
+    );
+    if (allowedScope.isEmpty) {
+      print(
+        '[WARNING] Scope vacío detectado en $taskId.md. Bloqueo preventivo activado.',
+      );
+    }
+
+    // 3. Check Scope Lock
+    final violations = checkScopeLock(
+      allowedScope: allowedScope,
+      modifiedFiles: modifiedFiles,
+      basePath: basePath,
+    );
+
+    if (violations.isNotEmpty) {
+      throw ComplianceException(
+        'SCOPE-VIOLATION: Intento de modificar archivos fuera del scope de $taskId: ${violations.join(", ")}',
+      );
+    }
+  }
+}
+
+class ComplianceException implements Exception {
+  final String message;
+  ComplianceException(this.message);
+  @override
+  String toString() => 'Compliance Violation: $message';
+}
+
+--- CONTENT END ---
+
+FILE: vault/ai_context.txt
+--- CONTENT START ---
+=== AI CONTEXT GENERATED: 2026-03-27 01:47:26.026863 ===
+TASK_ID: TASK-DPI-S15-01
+================================================
+
+FILE: bin/antigravity_dpi.dart
+--- CONTENT START ---
+import 'dart:io';
+import 'dart:convert';
+import 'package:args/args.dart';
+import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
+import 'package:antigravity_dpi/src/security/integrity_engine.dart';
+import 'package:antigravity_dpi/src/tasks/backlog_manager.dart';
+import 'package:antigravity_dpi/src/tasks/compliance_guard.dart';
+import 'package:antigravity_dpi/src/dash/dashboard_engine.dart';
+import 'package:antigravity_dpi/src/security/vanguard_core.dart';
+import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
+import 'package:antigravity_dpi/src/core/pack_engine.dart';
+import 'package:antigravity_dpi/src/core/context_engine.dart';
+import 'package:path/path.dart' as p;
+
+const String version = '1.0.0';
+
+void main(List<String> arguments) async {
+  final integrityEngine = IntegrityEngine();
+  final isSelfIntact = await integrityEngine.verifySelf(
+    toolRoot: Directory.current.path,
+  );
+  if (!isSelfIntact) {
+    print('[CRITICAL] SELF-AUDIT FAILED: El código fuente de la herramienta ha sido alterado. Operación abortada.');
+    exit(2);
+  }
+
+  final parser = ArgParser()
+    ..addCommand('act')
+    ..addCommand('audit')
+    ..addCommand('baseline')
+    ..addCommand('handover')
+    ..addCommand('takeover')
+    ..addCommand('status')
+    ..addCommand('context')
+    ..addCommand('vault', ArgParser()
+      ..addCommand('bind-key', ArgParser()
+        ..addOption('project', abbr: 'p', help: 'Project ID')
+        ..addOption('key', abbr: 'k', help: 'Path to RSA XML Key'))
+      ..addCommand('status'))
+    ..addCommand('pack')
+    ..addOption('path', abbr: 'p', help: 'Base path of the project', defaultsTo: Directory.current.path)
+    ..addOption('key', abbr: 'k', help: 'Path to the private RSA key XML');
+
+  final ArgResults results;
+  try {
+    results = parser.parse(arguments);
+  } catch (e) {
+    print('Error: ${e.toString()}');
+    return;
+  }
+
+  var basePath = (results['path'] ?? Directory.current.path) as String;
+  basePath = basePath.replaceAll('"', '').trim();
+  final keyPath = results['key'] as String?;
+  final command = results.command?.name;
+
+  if (command == null) {
+    print('antigravity_dpi v$version - Governance Control Plane');
+    print(parser.usage);
+    return;
+  }
+
+  print('[GOV] Executing command: $command');
+
+  switch (command) {
+    case 'audit':
+      final ok = await runAudit(basePath);
+      if (!ok) exit(1);
+      break;
+    case 'act':
+      await runAct(basePath);
+      break;
+    case 'baseline':
+      await runBaseline(basePath, keyPath);
+      break;
+    case 'status':
+      await runStatus(basePath);
+      break;
+    case 'context':
+      await runContext(basePath);
+      break;
+    case 'pack':
+      await runPack(basePath);
+      break;
+    case 'vault':
+      await runVault(basePath, results.command!);
+      break;
+    case 'handover':
+      await runHandover(basePath, keyPath);
+      break;
+    case 'takeover':
+      await runTakeover(basePath);
+      break;
+    default:
+      print('Command not implemented: $command');
+  }
+}
+
+Future<bool> runAudit(String basePath, {bool skipSignatureCheck = false}) async {
+  print('--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---');
+  try {
+    final integrity = IntegrityEngine();
+
+    // 1. Manifest Signature Check (VUL-08)
+    final poPublicKeyXml = await _resolvePublicKey(basePath);
+    if (poPublicKeyXml != null && !skipSignatureCheck) {
+      final isManifestOk = await integrity.verifyManifest(
+        basePath: basePath,
+        publicKeyXml: poPublicKeyXml,
+      );
+      if (!isManifestOk) {
+        print('[CRITICAL] KERNEL-VIOLATION: La firma del manifiesto (kernel.hashes.sig) es INVÁLIDA.');
+        return false;
+      }
+      print('  [✅] MANIFEST-SIG: OK');
+    } else {
+      print('  [!] WARNING: Omitiendo validación de firma de manifiesto.');
+    }
+
+    // 2. Hash Verification
+    final results = await integrity.verifyAll(basePath: basePath);
+    bool allOk = true;
+    for (var entry in results.entries) {
+      final status = entry.value ? '[OK]' : '[CORRUPT]';
+      print('  $status ${entry.key}');
+      if (!entry.value) allOk = false;
+    }
+
+    if (allOk) {
+      print('[✅] Auditoría de Integridad PASSED.');
+    } else {
+      print('[‼️] CRITICAL: Violación de Integridad detectada.');
+    }
+
+    // 3. Compliance Check
+    final backlog = BacklogManager();
+    final activeTasks = await backlog.checkConcurrency(basePath: basePath);
+    if (activeTasks.isNotEmpty) {
+      final taskId = activeTasks.first;
+      final compliance = ComplianceGuard();
+      final gitResult = await Process.run('git', ['status', '--porcelain', '--untracked-files=all'], workingDirectory: basePath);
+      final stdout = gitResult.stdout as String;
+      final modifiedFiles = stdout.split('\n')
+          .where((l) => l.length >= 3)
+          .map((l) => l.substring(3).trim())
+          .where((f) => f.isNotEmpty)
+          .toList();
+
+      try {
+        await compliance.enforcePreBaseline(taskId: taskId, modifiedFiles: modifiedFiles, basePath: basePath);
+        print('  [✅] COMPLIANCE-OK: $taskId');
+      } catch (e) {
+        print('  [❌] COMPLIANCE-FAIL: $e');
+        allOk = false;
+      }
+    }
+
+    // 4. Ledger Anchor Verification (VUL-11)
+    final isLedgerOk = await integrity.verifyLedgerAnchor(basePath: basePath);
+    if (!isLedgerOk) {
+      allOk = false;
+    }
+
+    // 5. Orphan Detection
+    final orphans = await integrity.detectOrphans(basePath: basePath);
+    if (orphans.isNotEmpty) {
+      print('\n  [!] WARNING: Archivos huérfanos detectados: ${orphans.join(", ")}\n');
+    }
+
+    print('Audit COMPLETED.');
+    return allOk;
+  } catch (e, stack) {
+    print('[CRITICAL] Error inesperado en audit: $e');
+    print(stack);
+    return false;
+  }
+}
+
+Future<void> runAct(String basePath) async {
+  await runAudit(basePath);
+
+  final telemetry = TelemetryService();
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  print('--- [TELEMETRY] PULSE ---');
+  print('Saturation: ${pulse.saturation}% | CP: ${pulse.cp}');
+
+  if (pulse.saturation > 90) {
+    print('[FATIGUE] Hard-stop: Saturation too high. Run handover.');
+  }
+
+  await telemetry.incrementTurns(basePath: basePath);
+  await telemetry.persistPulse(pulse, basePath: basePath);
+
+  final backlogManager = BacklogManager();
+  final activeTasks = await backlogManager.checkConcurrency(basePath: basePath);
+  final ledger = ForensicLedger();
+  
+  final taskId = activeTasks.isNotEmpty ? activeTasks.first : 'S06-GENERAL';
+  
+  try {
+    await ledger.appendEntry(
+      sessionId: 'ACT-${DateTime.now().millisecondsSinceEpoch}', 
+      type: 'EXEC', 
+      task: taskId, 
+      detail: 'Pulse: ${pulse.saturation}% sat, ${pulse.cp} CP', 
+      basePath: basePath
+    );
+    print('[✅] Pulse PERSISTIDO en historial.');
+  } catch (e) {
+    print('[⚠️] WARNING: No se pudo persistir el pulso en el historial: $e');
+  }
+}
+
+Future<void> runStatus(String basePath) async {
+  try {
+    final telemetry = TelemetryService();
+    final lockFile = File(p.join(basePath, 'session.lock'));
+    
+    double carryOver = 0.0;
+    String sessionState = 'UNKNOWN';
+    
+    if (await lockFile.exists()) {
+      final lockData = jsonDecode(await lockFile.readAsString());
+      
+      final integrity = IntegrityEngine();
+      if (!integrity.verifySessionMAC(lockData)) {
+          print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+          return;
+      }
+      
+      sessionState = lockData['status'] ?? 'UNKNOWN';
+      carryOver = (lockData['inherited_fatigue'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: carryOver);
+    
+    print('--- [GOV] PROJECT STATUS ---');
+    print('Estado Sesión: $sessionState');
+    print('Saturación:    ${pulse.saturation}%');
+    print('Puntos CP:     ${pulse.cp} (Heredado: $carryOver)');
+    print('----------------------------');
+  } catch (e) {
+    print('[CRITICAL] Fallo al recuperar estado: $e');
+  }
+}
+
+Future<void> runContext(String basePath) async {
+  final engine = ContextEngine();
+  await engine.generateContext(basePath: basePath);
+}
+
+Future<void> runHandover(String basePath, String? keyPath) async {
+  print('--- [HANDOVER] CIERRE DE SESIÓN ---');
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  final vanguard = VanguardCore();
+  final dashboard = DashboardEngine();
+
+  await runAudit(basePath);
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  await vanguard.issueChallenge(
+    level: 'TACTICAL',
+    project: backlog['project'] ?? 'UNKNOWN',
+    files: ['session.lock', 'intel_pulse.json'],
+    basePath: basePath,
+  );
+
+  final signed = await vanguard.waitForSignature(basePath: basePath);
+  if (!signed) {
+    print('[CRITICAL] Handover abortado: Se requiere firma del PO.');
+    return;
+  }
+
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final gitHash = (gitResult.stdout as String).trim();
+
+  final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
+  
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  final lockData = {
+    'status': 'HANDOVER_SEALED',
+    'timestamp': timestamp,
+    'shs_at_close': pulse.saturation,
+    'git_hash': gitHash,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+
+  await telemetry.resetCounters(basePath: basePath);
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint?['id'] ?? 'S04-GENERAL',
+    type: 'SNAP',
+    task: 'HANDOVER',
+    detail: 'Handover completed. SHS: ${pulse.saturation}%. Git: $gitHash',
+    basePath: basePath,
+  );
+
+  print('Handover COMPLETADO. Sesión SELLADA.');
+}
+
+Future<void> runTakeover(String basePath) async {
+  print('--- [TAKEOVER] RECUPERACIÓN DE SESIÓN ---');
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  double inheritedCP = 0.0;
+  String? lastHash;
+  
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  if (lockFile.existsSync()) {
+    final lock = jsonDecode(await lockFile.readAsString());
+    
+    final integrity = IntegrityEngine();
+    if (!integrity.verifySessionMAC(lock)) {
+        print('[CRITICAL] KERNEL-VIOLATION: session.lock MAC inválido o inexistente.');
+        return;
+    }
+    
+    if (lock['status'] != 'HANDOVER_SEALED') {
+      print('[CRITICAL] FAIL-SAFE: La sesión previa no fue cerrada correctamente.');
+      return;
+    }
+    inheritedCP = (lock['shs_at_close'] as num?)?.toDouble() ?? 0.0;
+    lastHash = lock['git_hash'] as String?;
+  }
+
+  // ALIGNMENT: Ensure we are on master to avoid detached HEAD drift
+  await Process.run('git', ['checkout', 'master'], workingDirectory: basePath);
+
+  // 2. Verificar Git Hash (HARD-STOP)
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final currentHash = (gitResult.stdout as String).trim();
+  if (lastHash != null && lastHash != currentHash) {
+    print('[CRITICAL] GIT-DRIFT: El hash actual ($currentHash) no coincide con el cierre ($lastHash). Abortando para proteger integridad.');
+    return;
+  }
+
+  await runAudit(basePath);
+
+  final lockData = {
+    'status': 'IN_PROGRESS',
+    'timestamp': DateTime.now().toIso8601String(),
+    'inherited_fatigue': inheritedCP,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+
+  // 3. Búsqueda de Tarea Objetivo
+  String targetTask = 'S04-GENERAL';
+  if (activeSprint != null) {
+    final tasks = activeSprint['tasks'] as List?;
+    if (tasks != null) {
+      final pending = tasks.firstWhere((t) => t['status'] == 'PENDING', orElse: () => null);
+      if (pending != null) {
+        targetTask = pending['id'];
+      }
+    }
+  }
+
+  // 4. Cálculo de Pulso Real
+  final pulse = await telemetry.computePulse(basePath: basePath, carryOverCP: inheritedCP);
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint?['id'] ?? 'S04-GENERAL',
+    type: 'SNAP',
+    task: 'TAKEOVER',
+    detail: 'Takeover success. Inherited CP: $inheritedCP',
+    basePath: basePath,
+  );
+
+  // 5. Consola Táctica
+  print('\n----------------------------------------');
+  print('  [GOV] TAKEOVER EXITOSO');
+  print('  Saturación Real: ${pulse.saturation}% (CP: ${pulse.cp})');
+  print('  Tarea Objetivo:  $targetTask');
+  print('\n[STATUS] Sesión reanudada con persistencia de fatiga heredada.');
+  print('----------------------------------------\n');
+}
+
+Future<void> runBaseline(String basePath, String? keyPath) async {
+  print('--- [BASELINE] SELLADO FORMAL DE KERNEL ---');
+  // En baseline, saltamos el check de firma porque precisamente vamos a regenerarla (VUL-08)
+  await runAudit(basePath, skipSignatureCheck: true);
+  print('DEBUG-BASELINE: Audit returned, continuing to seal...');
+
+  final backlogManager = BacklogManager();
+  final telemetry = TelemetryService();
+  final vanguard = VanguardCore();
+
+  final backlog = await backlogManager.loadBacklog(basePath: basePath);
+  final activeSprint = await backlogManager.getActiveSprint(backlog: backlog);
+  final pulse = await telemetry.computePulse(basePath: basePath);
+
+  if (activeSprint == null) {
+    print('[CRITICAL] No se encontró sprint activo.');
+    return;
+  }
+
+  print('DEBUG-BASELINE: Audit complete. Resolving key...');
+  // Resolve key from vault if not provided (VUL-02)
+  final resolvedKeyPath = keyPath ?? await _resolveKeyPath(basePath, activeSprint['id']);
+  print('DEBUG-BASELINE: Resolved Key Path: $resolvedKeyPath');
+  if (resolvedKeyPath == null) {
+     print('[CRITICAL] No se encontró clave vinculada para el proyecto. Use "gov vault bind-key".');
+     return;
+  }
+
+  final gitResult = await Process.run('git', ['rev-parse', '--short', 'HEAD'], workingDirectory: basePath);
+  final gitHash = (gitResult.stdout as String).trim();
+  print('DEBUG-BASELINE: Git Hash: $gitHash');
+  final timestamp = DateTime.now().toIso8601String().split('.')[0].replaceFirst('T', ' ');
+
+  final lockFile = File(p.join(basePath, 'session.lock'));
+  final lockData = {
+    'status': 'BASELINE_SEALED',
+    'timestamp': timestamp,
+    'sprint_id': activeSprint['id'],
+    'git_hash': gitHash,
+  };
+  
+  final integrity = IntegrityEngine();
+  lockData['_mac'] = integrity.generateSessionMAC(lockData);
+  
+  await lockFile.writeAsString(jsonEncode(lockData));
+  print('DEBUG-BASELINE: session.lock updated.');
+
+  // 2. Generate and Sign Manifest (VUL-08)
+  print('[DEBUG] Generando nuevo manifiesto de hashes...');
+  final newHashes = await integrity.generateHashes(basePath: basePath);
+  
+  // Enforce sorted keys for deterministic JSON (VUL-08)
+  final sortedHashesArr = newHashes.keys.toList()..sort();
+  final sortedHashes = { for (var k in sortedHashesArr) k : newHashes[k] };
+  
+  final hashesFile = File(p.join(basePath, 'vault', 'kernel.hashes'));
+  await hashesFile.writeAsString(JsonEncoder.withIndent('  ').convert(sortedHashes));
+  print('DEBUG-BASELINE: kernel.hashes written.');
+
+  final keyFile = File(resolvedKeyPath);
+  if (!await keyFile.exists()) {
+    print('[ERROR] SignEngine: Error al cargar clave privada del PO. El archivo NO EXISTE en esa ruta.');
+    return;
+  }
+  final privateKeyXml = await keyFile.readAsString();
+  print('DEBUG-BASELINE: Signing manifest...');
+  await integrity.signManifest(basePath: basePath, privateKeyXml: privateKeyXml);
+  print('DEBUG-BASELINE: Manifest signed.');
+
+  final ledger = ForensicLedger();
+  await ledger.appendEntry(
+    sessionId: activeSprint['id'],
+    type: 'BASE',
+    task: 'BASELINE',
+    detail: 'Baseline sealed. Git: $gitHash',
+    basePath: basePath,
+  );
+
+  print('Baseline COMPLETADO. Sprint ${activeSprint['id']} SELLADO con éxito.');
+}
+
+/// S12-01: Vault implementation for secure key binding (VUL-02).
+Future<void> runVault(String basePath, ArgResults command) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  Map<String, String> keys = {};
+  
+  if (await vaultFile.exists()) {
+    keys = Map<String, String>.from(jsonDecode(await vaultFile.readAsString()));
+  }
+
+  final subCommand = command.command;
+  if (subCommand == null) {
+    print('[ERROR] Debe especificar un subcomando de vault (bind-key, status).');
+    return;
+  }
+
+  switch (subCommand.name) {
+    case 'bind-key':
+      final id = subCommand['project'] as String?;
+      final path = subCommand['key'] as String?;
+      if (id == null || path == null) {
+        print('[ERROR] Faltan argumentos: --project <ID> --key <PATH>');
+        return;
+      }
+      keys[id] = path;
+      await vaultFile.writeAsString(jsonEncode(keys));
+      print('[✅] Clave vinculada exitosamente para: $id');
+      break;
+    case 'status':
+      print('--- [VAULT] CLAVES VINCULADAS ---');
+      keys.forEach((id, path) => print('  $id -> $path'));
+      break;
+    default:
+      print('[ERROR] Subcomando de vault no reconocido: ${subCommand.name}');
+  }
+}
+
+Future<String?> _resolvePublicKey(String basePath) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (await vaultFile.exists()) {
+    final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+    print('DEBUG: [VAULT-LOAD] Claves cargadas: ${keys.length}');
+    for (var entry in keys.entries) {
+      final keyPath = entry.value as String;
+      final pubKeyPath = keyPath.replaceFirst('_private.xml', '_public.xml');
+      final pubKeyFile = File(p.join(basePath, pubKeyPath));
+      print('DEBUG: [VAULT-LOAD] Probando clave: ${pubKeyFile.path}');
+      if (await pubKeyFile.exists()) {
+        return await pubKeyFile.readAsString();
+      }
+    }
+  }
+
+  // Fallback to default path
+  final pubKeyFile = File(p.join(basePath, 'vault', 'po_public.xml'));
+  print('DEBUG: Buscando clave pública (fallback) en: ${pubKeyFile.path}');
+  if (await pubKeyFile.exists()) {
+    return await pubKeyFile.readAsString();
+  }
+  return null;
+}
+
+Future<String?> _resolveKeyPath(String basePath, String projectId) async {
+  final vaultFile = File(p.join(basePath, 'vault', 'keys.json'));
+  if (!await vaultFile.exists()) return null;
+  
+  final Map<String, dynamic> keys = jsonDecode(await vaultFile.readAsString());
+  return keys[projectId] as String?;
+}
+
+Future<void> runPack(String basePath) async {
+  try {
+    print('--- [PACK] EXPORTACIÓN PARA AUDITORÍA ---');
+    
+    // 1. Mandatory Audit
+    print('[INFO] Ejecutando auditoría previa...');
+    await runAudit(basePath);
+
+    // 2. Packaging
+    final packer = PackEngine();
+    final zipPath = await packer.pack(basePath: basePath);
+
+    final ledger = ForensicLedger();
+    await ledger.appendEntry(
+      sessionId: 'PACK-${DateTime.now().millisecondsSinceEpoch}',
+      type: 'SNAP',
+      task: 'PACK',
+      detail: 'Project exported to ZIP: ${p.basename(zipPath)}',
+      basePath: basePath,
+    );
+
+    print('\n----------------------------------------');
+    print('  [GOV] EXPORTACIÓN EXITOSA');
+    print('  Archivo: $zipPath');
+    print('----------------------------------------\n');
+  } catch (e, stack) {
+    print('[CRITICAL] Error en pack: $e');
+    print(stack);
+  }
+}
+
+--- CONTENT END ---
+
+FILE: lib/src/tasks/compliance_guard.dart
+--- CONTENT START ---
+import 'dart:io';
+import 'package:path/path.dart' as p;
+
+/// ComplianceGuard: Enforces scope-lock and referential task integrity.
+class ComplianceGuard {
+  // Scope definitions migrated from Base2/ops-audit.ps1
+  static final Map<String, List<RegExp>> scopeRules = {
+    'UI': [RegExp(r'lib/.*\.dart'), RegExp(r'assets/.*')],
+    'DATA': [RegExp(r'lib/.*\.dart')],
+    'SHELL': [RegExp(r'.*\.ps1'), RegExp(r'.*\.bat'), RegExp(r'pubspec\.yaml')],
+    'GOV': [RegExp(r'ops-.*\.ps1'), RegExp(r'.*\.md'), RegExp(r'GEMINI\.md')],
+    'SEC': [RegExp(r'lib/src/security/.*'), RegExp(r'vault/.*')],
+    'PLAN': [RegExp(r'.*\.md'), RegExp(r'\.meta/.*')],
+  };
+
+  /// Archivos de sistema gestionados por gov.exe que están exentos del Scope-Lock estricto.
+  static const List<String> systemExemptions = [
+    'session.lock',
+    'backlog.json',
+    'all_hashes.json', // Diagnóstico de integridad
+    'fleet_targets.tmp', // Temporal del orquestador de flota
+    'update_self_hashes.dart', // Soporte de recertificación
+    'sync_self.dart', // Fixed name
+    'final_sync.dart',
+    'task.md',
+    'DASHBOARD.md',
+    'BASELINE.md',
+    'TASK-DPI-', // Exempt all task files
+    'pubspec.lock',
+    'SESSION_RELAY_TECH.md',
+    '.log', // Exención para archivos de traza y auditoría
+    '.tmp', // Exención para archivos temporales de orquestación
+    'vault/', // Toda la telemetría, pulsos y logs
+    'HISTORY.md',
+    'bin/', // Exención para binarios de la herramienta
+    'lib/', // Exención para código fuente de la herramienta (Self-Audit)
+    'test/', // Exención para pruebas unitarias
+  ];
+
+  /// Extracts the allowed files/patterns from the "## Scope:" section of a TASK-ID.md.
+  Future<List<String>> extractScopeFromMd({
+    required String taskId,
+    required String basePath,
+  }) async {
+    final taskFile = File(p.join(basePath, '$taskId.md'));
+    if (!await taskFile.exists()) {
+      throw ComplianceException('TASK-NOT-FOUND: $taskId.md no existe.');
+    }
+
+    final lines = await taskFile.readAsLines();
+    bool inScopeSection = false;
+    List<String> allowedPatterns = [];
+
+    for (var line in lines) {
+      if (line.trim().startsWith('## Scope')) {
+        inScopeSection = true;
+        continue;
+      }
+      if (inScopeSection && line.trim().startsWith('## ')) {
+        break; // End of section
+      }
+      if (inScopeSection && line.trim().startsWith('- ')) {
+        // Extract and normalize
+        final clean = line
+            .trim()
+            .substring(2)
+            .replaceAll('`', '')
+            .replaceAll('file:///', '')
+            .replaceAll('\\', '/');
+        if (clean.isNotEmpty) {
+          allowedPatterns.add(clean);
+        }
+      }
+    }
+    return allowedPatterns;
+  }
+
+  /// Verifies that modified files match the active task's strict scope.
+  List<String> checkScopeLock({
+    required List<String> allowedScope,
+    required List<String> modifiedFiles,
+    required String basePath,
+  }) {
+    final violations = <String>[];
+    for (final file in modifiedFiles) {
+      // Normalización robusta para evitar Path Traversal (VUL-19)
+      final absBase = p.canonicalize(basePath);
+      final absFile = p.canonicalize(p.join(absBase, file));
+      
+      if (!p.isWithin(absBase, absFile) && absFile != absBase) {
+        throw ComplianceException('PATH-TRAVERSAL-DETECTED: Intento de acceder a archivo fuera de la base: $file');
+      }
+
+      String cleanFile = p.relative(absFile, from: absBase).replaceAll('\\', '/');
+      print('DEBUG: file=$file | cleanFile=$cleanFile');
+
+      final cleanFileLower = cleanFile.toLowerCase();
+
+      // 1. Verificar Exenciones del Sistema
+      bool isExempt = false;
+      for (final exempt in systemExemptions) {
+        final normalizedExempt = exempt.replaceAll('\\', '/').toLowerCase();
+        
+        if (normalizedExempt.endsWith('/')) {
+          // Exención de directorio: debe coincidir con el prefijo incluyendo el separador
+          if (cleanFileLower.startsWith(normalizedExempt)) {
+            // Permitir exenciones globales excepto para el núcleo (lib/bin) que requiere scope explícito
+            if (!cleanFileLower.startsWith('lib/') && !cleanFileLower.startsWith('bin/')) {
+              isExempt = true;
+              break;
+            }
+          }
+        } else if (normalizedExempt == 'task-dpi-') {
+          // VUL-09: Exención estricta para archivos de tarea .md
+          if (RegExp(r'^task-dpi-.*\.md$').hasMatch(cleanFileLower)) {
+            isExempt = true;
+            break;
+          }
+        } else if (normalizedExempt.startsWith('.')) {
+          // Exención por extensión
+          if (cleanFileLower.endsWith(normalizedExempt)) {
+            isExempt = true;
+            break;
+          }
+        } else if (cleanFileLower == normalizedExempt) {
+          // Coincidencia exacta
+          isExempt = true;
+          break;
+        }
+      }
+      
+      // Casos específicos de archivos de sistema que siempre son exentos
+      if (cleanFileLower == 'session.lock' || 
+          cleanFileLower == 'task.md' || 
+          cleanFileLower.startsWith('vault/')) {
+        isExempt = true;
+      }
+
+      if (isExempt) continue;
+
+      bool isAllowed = false;
+      for (var pattern in allowedScope) {
+        final normalizedPattern = pattern.replaceAll('\\', '/').toLowerCase();
+        
+        if (normalizedPattern.endsWith('/')) {
+          if (cleanFileLower.startsWith(normalizedPattern)) {
+            isAllowed = true;
+            break;
+          }
+        } else {
+          if (cleanFileLower == normalizedPattern ||
+              cleanFileLower.startsWith(normalizedPattern + '/')) {
+            isAllowed = true;
+            break;
+          }
+        }
+      }
+      if (!isAllowed) {
+        violations.add(file);
+      }
+    }
+    return violations;
+  }
+
+  /// Verifies referential integrity: TASK-ID.md must exist and have Scope/CP.
+  Future<bool> checkReferentialIntegrity({
+    required String taskId,
+    required String basePath,
+  }) async {
+    final taskFile = File(p.join(basePath, '$taskId.md'));
+    if (!await taskFile.exists()) return false;
+
+    final content = await taskFile.readAsString();
+    final hasScope = content.contains(
+      RegExp(r'^## Scope|^Scope:', multiLine: true),
+    );
+    final hasCp = content.contains(
+      RegExp(r'^\*\*CP\*\*:\s*\d+|^CP:\s*\d+', multiLine: true),
+    );
+    return hasScope && hasCp;
+  }
+
+  /// Enforces all compliance rules before allowing an operation.
+  Future<void> enforcePreBaseline({
+    required String taskId,
+    required List<String> modifiedFiles,
+    required String basePath,
+  }) async {
+    // 1. Referential Integrity First
+    final isRefOk = await checkReferentialIntegrity(
+      taskId: taskId,
+      basePath: basePath,
+    );
+    if (!isRefOk) {
+      throw ComplianceException(
+        'REFERENTIAL-FAIL: $taskId.md es inválido o no existe.',
+      );
+    }
+
+    // 2. Extract Dynamic Scope
+    final allowedScope = await extractScopeFromMd(
+      taskId: taskId,
+      basePath: basePath,
+    );
+    if (allowedScope.isEmpty) {
+      print(
+        '[WARNING] Scope vacío detectado en $taskId.md. Bloqueo preventivo activado.',
+      );
+    }
+
+    // 3. Check Scope Lock
+    final violations = checkScopeLock(
+      allowedScope: allowedScope,
+      modifiedFiles: modifiedFiles,
+      basePath: basePath,
+    );
+
+    if (violations.isNotEmpty) {
+      throw ComplianceException(
+        'SCOPE-VIOLATION: Intento de modificar archivos fuera del scope de $taskId: ${violations.join(", ")}',
+      );
+    }
+  }
+}
+
+class ComplianceException implements Exception {
+  final String message;
+  ComplianceException(this.message);
+  @override
+  String toString() => 'Compliance Violation: $message';
+}
+
+--- CONTENT END ---
+
+FILE: TASK-DPI-S15-01.md
+--- CONTENT START ---
+# TASK-DPI-S15-01: Generador de Contexto (gov context)
+
+**Sprint**: S15-SYMBIOSIS
+**Label**: [AI-CORE]
+**CP**: 3
+**Gate**: GATE-RED
+**Revisor**: [ARCH]
+**Modelo**: Gemini Flash
+
+## Contexto
+Crear un comando `gov context` que genere un archivo curado (`vault/ai_context.txt`) con el código fuente de los archivos dentro del `Scope` de la tarea activa, el `DASHBOARD.md` y el `GEMINI.md`. Esto focaliza a la IA, reduce el consumo de tokens y previene alucinaciones.
+
+## Scope
+- `bin/antigravity_dpi.dart`
+- `lib/src/core/context_engine.dart` (Nuevo)
+- `lib/src/tasks/compliance_guard.dart`
+- `vault/ai_context.txt`
+- `TASK-DPI-S15-01.md`
+
+## DoD
+- [ ] Nuevo comando `gov context` implementado.
+- [ ] `gov context` genera `vault/ai_context.txt` con el contenido de los archivos en el `Scope` de la tarea activa.
+- [ ] `vault/ai_context.txt` incluye el contenido de `DASHBOARD.md` y `GEMINI.md`.
+- [ ] `gov context` registra una entrada `SNAP | CONTEXT` en `HISTORY.md`.
+--- CONTENT END ---
+
+FILE: DASHBOARD.md
+--- CONTENT START ---
+# DASHBOARD — Base2 Kernel DPI
+**Generado**: 2026-03-25 22:44
+**Estado de Fatiga**: 🟢 OPTIMAL
+
+## 📊 Telemetría SHS (Real-Time)
+| Métrica | Valor | Impacto (CP) |
+| :--- | :--- | :--- |
+| **Saturación** | 1% | 0.3 |
+| Turnos (Tools) | 0 | 0.0 |
+| Chats | 0 | 0.0 |
+| Swelling (Base) | - | 0.3 |
+| Fatigue Pasiva | - | 0.0 |
+
+## 🚀 Sesión Actual
+- **Sprint**: S04-COMPLIANCE
+- **Tarea**: TASK-DPI-S04-02
+
+## 🛡️ Seguridad & Integridad
+- **Signed Pulse**: ✅ VERIFICADO (Hash: N/A)
+- **Kernel Guard**: LOCKED
+
+---
+*Actualizado automáticamente vía gov watch*
+
+--- CONTENT END ---
+
+FILE: GEMINI.md
+--- CONTENT START ---
+# GEMINI.md — antigravity_dpi [DPI-GATE-GOLD]
+
+> [!IMPORTANT]
+> **PROTOCOLO DE VERDAD ATÓMICA**: La IA no puede inferir el estado de un proyecto gobernado. Debe consultar `gov audit` o los motores de integridad directamente. Ningún cambio en lógica de cálculo se acepta sin pruebas unitarias (`test/`).
+
+## 1. SELECTOR DE ROL
+Para este proyecto, el rol es **Arquitecto de Gobernanza (Interno)**. El enfoque es la robustez del motor, no la UI.
+
+## 2. REGLAS CRÍTICAS (Anti-Alucinación)
+1. **Self-Audit Obligatorio**: Antes de cualquier commit, el binario debe certificar su propio código fuente.
+2. **Determinismo Unitario**: Toda nueva función aritmética (`Pulse`, `SHS`) requiere un test unitario en `test/` que verifique la precisión con datos de prueba.
+3. **Draft-check Externo**: Prohibido sugerir "handover" si el `SHS` ha caído por debajo del 90% sin una justificación técnica atada a una `TASK-DPI-ID`.
+
+## 3. JERARQUÍA SSoT
+1. **VISION.md** (Identidad y Cercas Eléctricas).
+2. **GEMINI.md** (Protocolos de la IA).
+3. **TASK-DPI-* .md** (Documentos de Tarea).
+
+## 4. GATE SYSTEM
+- **GATE-GOLD**: Motor de Integridad (`lib/src/security/`), Telemetría y Criptografía. Requiere firma RSA.
+- **GATE-RED**: Orquestación de Sprints, Gestión de Backlog y CLI.
+
+## 5. PROTOCOLO DE RELEVOS (Handover/Takeover)
+1. **Relay Atómico**: Cada sesión debe terminar con `gov handover`. El relay generado debe contener el hash de Git y la firma RSA del PO.
+2. **Continuidad Certificada**: `gov takeover` es el único método autorizado para reanudar el trabajo sobre el Kernel. Si el audit de integridad falla, la toma de posesión debe ser bloqueada.
+3. **Persistencia del Pulso**: El estado SHS final de una sesión debe persistir en el Relay para asegurar que el analista entrante comprenda el nivel de fatiga cognitiva heredado.
+
+*[v1.1.0] Protocolo extendido con persistencia de sesiones.*
+
+--- CONTENT END ---
+
+FILE: VISION.md
+--- CONTENT START ---
+# VISION.md — antigravity_dpi (gov.exe)
+
+## IDENTIDAD
+Control Plane (Plano de Gobernanza) para el ecosistema Base2.
+Compilado a `gov.exe` — binario 100% Dart, sin dependencias Flutter ni PowerShell.
+
+## RESPONSABILIDADES
+1. Verificar integridad del Kernel (SHA-256 + RSA).
+2. Calcular y firmar métricas de telemetría (SHS/Pulse).
+3. Orquestar cumplimiento de tareas (backlog, task.md, DASHBOARD.md).
+4. Gestionar el ciclo Handover/Takeover de sesiones.
+
+## CERCAS ELÉCTRICAS
+- NO lógica de UI. Solo CLI.
+- NO llamadas externas a PowerShell para operaciones criptográficas.
+- NO modificar archivos fuera del scope de la tarea activa.
+- NO baseline sin firma RSA para cambios GATE-RED o superior.
+
+--- CONTENT END ---
+
+
+--- CONTENT END ---
+
+FILE: TASK-DPI-S15-01.md
+--- CONTENT START ---
+# TASK-DPI-S15-01: Generador de Contexto (gov context)
+
+**Sprint**: S15-SYMBIOSIS
+**Label**: [AI-CORE]
+**CP**: 3
+**Gate**: GATE-RED
+**Revisor**: [ARCH]
+**Modelo**: Gemini Flash
+
+## Contexto
+Crear un comando `gov context` que genere un archivo curado (`vault/ai_context.txt`) con el código fuente de los archivos dentro del `Scope` de la tarea activa, el `DASHBOARD.md` y el `GEMINI.md`. Esto focaliza a la IA, reduce el consumo de tokens y previene alucinaciones.
+
+## Scope
+- `bin/antigravity_dpi.dart`
+- `lib/src/core/context_engine.dart` (Nuevo)
+- `lib/src/tasks/compliance_guard.dart`
+- `vault/ai_context.txt`
+- `TASK-DPI-S15-01.md`
+
+## DoD
+- [ ] Nuevo comando `gov context` implementado.
+- [ ] `gov context` genera `vault/ai_context.txt` con el contenido de los archivos en el `Scope` de la tarea activa.
+- [ ] `vault/ai_context.txt` incluye el contenido de `DASHBOARD.md` y `GEMINI.md`.
+- [ ] `gov context` registra una entrada `SNAP | CONTEXT` en `HISTORY.md`.
+--- CONTENT END ---
+
+FILE: DASHBOARD.md
+--- CONTENT START ---
+# DASHBOARD — Base2 Kernel DPI
+**Generado**: 2026-03-25 22:44
+**Estado de Fatiga**: 🟢 OPTIMAL
+
+## 📊 Telemetría SHS (Real-Time)
+| Métrica | Valor | Impacto (CP) |
+| :--- | :--- | :--- |
+| **Saturación** | 1% | 0.3 |
+| Turnos (Tools) | 0 | 0.0 |
+| Chats | 0 | 0.0 |
+| Swelling (Base) | - | 0.3 |
+| Fatigue Pasiva | - | 0.0 |
+
+## 🚀 Sesión Actual
+- **Sprint**: S04-COMPLIANCE
+- **Tarea**: TASK-DPI-S04-02
+
+## 🛡️ Seguridad & Integridad
+- **Signed Pulse**: ✅ VERIFICADO (Hash: N/A)
+- **Kernel Guard**: LOCKED
+
+---
+*Actualizado automáticamente vía gov watch*
+
+--- CONTENT END ---
+
+FILE: GEMINI.md
+--- CONTENT START ---
+# GEMINI.md — antigravity_dpi [DPI-GATE-GOLD]
+
+> [!IMPORTANT]
+> **PROTOCOLO DE VERDAD ATÓMICA**: La IA no puede inferir el estado de un proyecto gobernado. Debe consultar `gov audit` o los motores de integridad directamente. Ningún cambio en lógica de cálculo se acepta sin pruebas unitarias (`test/`).
+
+## 1. SELECTOR DE ROL
+Para este proyecto, el rol es **Arquitecto de Gobernanza (Interno)**. El enfoque es la robustez del motor, no la UI.
+
+## 2. REGLAS CRÍTICAS (Anti-Alucinación)
+1. **Self-Audit Obligatorio**: Antes de cualquier commit, el binario debe certificar su propio código fuente.
+2. **Determinismo Unitario**: Toda nueva función aritmética (`Pulse`, `SHS`) requiere un test unitario en `test/` que verifique la precisión con datos de prueba.
+3. **Draft-check Externo**: Prohibido sugerir "handover" si el `SHS` ha caído por debajo del 90% sin una justificación técnica atada a una `TASK-DPI-ID`.
+
+## 3. JERARQUÍA SSoT
+1. **VISION.md** (Identidad y Cercas Eléctricas).
+2. **GEMINI.md** (Protocolos de la IA).
+3. **TASK-DPI-* .md** (Documentos de Tarea).
+
+## 4. GATE SYSTEM
+- **GATE-GOLD**: Motor de Integridad (`lib/src/security/`), Telemetría y Criptografía. Requiere firma RSA.
+- **GATE-RED**: Orquestación de Sprints, Gestión de Backlog y CLI.
+
+## 5. PROTOCOLO DE RELEVOS (Handover/Takeover)
+1. **Relay Atómico**: Cada sesión debe terminar con `gov handover`. El relay generado debe contener el hash de Git y la firma RSA del PO.
+2. **Continuidad Certificada**: `gov takeover` es el único método autorizado para reanudar el trabajo sobre el Kernel. Si el audit de integridad falla, la toma de posesión debe ser bloqueada.
+3. **Persistencia del Pulso**: El estado SHS final de una sesión debe persistir en el Relay para asegurar que el analista entrante comprenda el nivel de fatiga cognitiva heredado.
+
+*[v1.1.0] Protocolo extendido con persistencia de sesiones.*
+
+--- CONTENT END ---
+
+FILE: VISION.md
+--- CONTENT START ---
+# VISION.md — antigravity_dpi (gov.exe)
+
+## IDENTIDAD
+Control Plane (Plano de Gobernanza) para el ecosistema Base2.
+Compilado a `gov.exe` — binario 100% Dart, sin dependencias Flutter ni PowerShell.
+
+## RESPONSABILIDADES
+1. Verificar integridad del Kernel (SHA-256 + RSA).
+2. Calcular y firmar métricas de telemetría (SHS/Pulse).
+3. Orquestar cumplimiento de tareas (backlog, task.md, DASHBOARD.md).
+4. Gestionar el ciclo Handover/Takeover de sesiones.
+
+## CERCAS ELÉCTRICAS
+- NO lógica de UI. Solo CLI.
+- NO llamadas externas a PowerShell para operaciones criptográficas.
+- NO modificar archivos fuera del scope de la tarea activa.
+- NO baseline sin firma RSA para cambios GATE-RED o superior.
+
+--- CONTENT END ---
+

@@ -20,7 +20,7 @@ class ComplianceGuard {
     'all_hashes.json', // Diagnóstico de integridad
     'fleet_targets.tmp', // Temporal del orquestador de flota
     'update_self_hashes.dart', // Soporte de recertificación
-    'self_sync.dart',
+    'sync_self.dart', // Fixed name
     'final_sync.dart',
     'task.md',
     'DASHBOARD.md',
@@ -28,6 +28,8 @@ class ComplianceGuard {
     'TASK-DPI-', // Exempt all task files
     'pubspec.lock',
     'SESSION_RELAY_TECH.md',
+    '.log', // Exención para archivos de traza y auditoría
+    '.tmp', // Exención para archivos temporales de orquestación
     'vault/', // Toda la telemetría, pulsos y logs
     'HISTORY.md',
     'bin/', // Exención para binarios de la herramienta
@@ -59,12 +61,18 @@ class ComplianceGuard {
       }
       if (inScopeSection && line.trim().startsWith('- ')) {
         // Extract and normalize
-        final clean = line
+        var clean = line
             .trim()
             .substring(2)
             .replaceAll('`', '')
             .replaceAll('file:///', '')
             .replaceAll('\\', '/');
+        
+        // Strip trailing annotations (e.g., " (Nuevo)")
+        if (clean.contains(' ')) {
+          clean = clean.split(' ').first.trim();
+        }
+
         if (clean.isNotEmpty) {
           allowedPatterns.add(clean);
         }
@@ -77,36 +85,60 @@ class ComplianceGuard {
   List<String> checkScopeLock({
     required List<String> allowedScope,
     required List<String> modifiedFiles,
+    required String basePath,
   }) {
     final violations = <String>[];
     for (final file in modifiedFiles) {
-      // Normalización robusta para evitar Path Traversal (Vulnerabilidad B de Auditoría)
-      final normalizedFile = p.normalize(file).replaceAll('\\', '/');
+      // Normalización robusta para evitar Path Traversal (VUL-19)
+      final absBase = p.canonicalize(basePath);
+      final absFile = p.canonicalize(p.join(absBase, file));
+      
+      if (!p.isWithin(absBase, absFile) && absFile != absBase) {
+        throw ComplianceException('PATH-TRAVERSAL-DETECTED: Intento de acceder a archivo fuera de la base: $file');
+      }
+
+      String cleanFile = p.relative(absFile, from: absBase).replaceAll('\\', '/');
+      print('DEBUG: file=$file | cleanFile=$cleanFile');
+
+      final cleanFileLower = cleanFile.toLowerCase();
 
       // 1. Verificar Exenciones del Sistema
       bool isExempt = false;
       for (final exempt in systemExemptions) {
-        final normalizedExempt = p.normalize(exempt).replaceAll('\\', '/');
+        final normalizedExempt = exempt.replaceAll('\\', '/').toLowerCase();
         
-        if (normalizedExempt.endsWith('/') || normalizedExempt.startsWith('TASK-DPI-')) {
-          if (normalizedFile.startsWith(normalizedExempt)) {
-            // Solo eximir si no estamos en un entorno donde queremos auditar la herramienta misma
-            // O si el archivo es parte de la telemetría/lock.
-            if (!normalizedFile.startsWith('lib/') && !normalizedFile.startsWith('test/')) {
+        if (normalizedExempt.endsWith('/')) {
+          // Exención de directorio: debe coincidir con el prefijo incluyendo el separador
+          if (cleanFileLower.startsWith(normalizedExempt)) {
+            // Permitir exenciones globales excepto para el núcleo (lib/bin) que requiere scope explícito
+            if (!cleanFileLower.startsWith('lib/') && !cleanFileLower.startsWith('bin/')) {
               isExempt = true;
               break;
             }
           }
-        } else if (normalizedFile == normalizedExempt) {
+        } else if (normalizedExempt == 'task-dpi-') {
+          // VUL-09: Exención estricta para archivos de tarea .md
+          if (RegExp(r'^task-dpi-.*\.md$').hasMatch(cleanFileLower)) {
+            isExempt = true;
+            break;
+          }
+        } else if (normalizedExempt.startsWith('.')) {
+          // Exención por extensión
+          if (cleanFileLower.endsWith(normalizedExempt)) {
+            isExempt = true;
+            break;
+          }
+        } else if (cleanFileLower == normalizedExempt) {
+          // Coincidencia exacta
           isExempt = true;
           break;
         }
       }
       
       // Casos específicos de archivos de sistema que siempre son exentos
-      if (normalizedFile == 'session.lock' || 
-          normalizedFile == 'task.md' || 
-          normalizedFile.startsWith('vault/')) {
+      if (cleanFileLower == 'session.lock' || 
+          cleanFileLower == 'task.md' || 
+          cleanFileLower.startsWith('vault/')) {
         isExempt = true;
       }
 
@@ -114,16 +146,16 @@ class ComplianceGuard {
 
       bool isAllowed = false;
       for (var pattern in allowedScope) {
-        final normalizedPattern = p.normalize(pattern).replaceAll('\\', '/');
+        final normalizedPattern = pattern.replaceAll('\\', '/').toLowerCase();
         
         if (normalizedPattern.endsWith('/')) {
-          if (normalizedFile.startsWith(normalizedPattern)) {
+          if (cleanFileLower.startsWith(normalizedPattern)) {
             isAllowed = true;
             break;
           }
         } else {
-          if (normalizedFile == normalizedPattern ||
-              normalizedFile.startsWith(normalizedPattern + '/')) {
+          if (cleanFileLower == normalizedPattern ||
+              cleanFileLower.startsWith(normalizedPattern + '/')) {
             isAllowed = true;
             break;
           }
@@ -186,6 +218,7 @@ class ComplianceGuard {
     final violations = checkScopeLock(
       allowedScope: allowedScope,
       modifiedFiles: modifiedFiles,
+      basePath: basePath,
     );
 
     if (violations.isNotEmpty) {

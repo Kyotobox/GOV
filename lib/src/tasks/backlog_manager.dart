@@ -66,6 +66,19 @@ class BacklogManager {
         .toList();
   }
 
+  /// returns the first task that is 'IN_PROGRESS' or 'PENDING'.
+  Map<String, dynamic>? getActiveTask(Map<String, dynamic> sprint) {
+    final tasks = sprint['tasks'] as List?;
+    if (tasks == null) return null;
+    
+    final active = tasks.firstWhere(
+      (t) => t['status'] == 'IN_PROGRESS' || t['status'] == 'IN-PROGRESS',
+      orElse: () => tasks.firstWhere((t) => t['status'] == 'PENDING', orElse: () => null),
+    );
+    
+    return active != null ? Map<String, dynamic>.from(active) : null;
+  }
+
   /// Checks if any task in task.md is currently being executed by another instance.
   /// Returns a list of tasks that are 'IN_PROGRESS' [/].
   Future<List<String>> checkConcurrency({required String basePath}) async {

@@ -31,11 +31,23 @@ class PackEngine {
 
     print('[PACK] Empaquetando: $basePath');
     
-    await for (var entity in dir.list(recursive: true)) {
+    await for (var entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
-        final relPath = p.relative(entity.path, from: basePath);
+        final absPath = p.canonicalize(entity.path);
+        final absBase = p.canonicalize(basePath);
         
+        // VUL-14: Prevent ZipSlip and Host Leakage
+        if (!p.isWithin(absBase, absPath) && absPath != absBase) {
+          print('[!] WARNING: Saltando archivo fuera de la base (posible ZipSlip): ${entity.path}');
+          continue;
+        }
+
+        final relPath = p.relative(absPath, from: absBase);
         final normalizedRel = relPath.replaceAll('\\', '/');
+        
+        if (normalizedRel.contains('..')) {
+           throw 'ZIP-SLIP-DETECTED: Ruta maliciosa detectada en empaquetado: $normalizedRel';
+        }
         
         // VUL-13: Mandatory inclusion for core source directories
         final isMandatory = normalizedRel.startsWith('lib/') || 

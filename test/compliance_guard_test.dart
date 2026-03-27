@@ -71,6 +71,7 @@ Test task.
       final violations = guard.checkScopeLock(
         allowedScope: allowedScope,
         modifiedFiles: modified,
+        basePath: tempDir,
       );
 
       expect(violations, isEmpty);
@@ -86,6 +87,7 @@ Test task.
       final violations = guard.checkScopeLock(
         allowedScope: allowedScope,
         modifiedFiles: modified,
+        basePath: tempDir,
       );
 
       expect(violations, contains('lib/src/security/sign_engine.dart'));
@@ -102,9 +104,26 @@ Test task.
       final violations = guard.checkScopeLock(
         allowedScope: allowedScope,
         modifiedFiles: modified,
+        basePath: tempDir,
       );
 
       expect(violations, isEmpty);
+    });
+
+    test('prevents path traversal evasion (VUL-B)', () {
+      final modified = [
+        'lib/src/tasks/../security/sign_engine.dart', // Evasion attempt
+      ];
+
+      final violations = guard.checkScopeLock(
+        allowedScope: allowedScope,
+        modifiedFiles: modified,
+        basePath: tempDir,
+      );
+
+      // Should be detected because it resolves to lib/src/security/sign_engine.dart
+      // which is NOT in allowedScope.
+      expect(violations, contains('lib/src/tasks/../security/sign_engine.dart'));
     });
   });
 

@@ -1,18 +1,18 @@
-import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:path/path.dart' as p;
-import '../lib/src/security/sign_engine.dart';
+import 'package:antigravity_dpi/src/security/sign_engine.dart';
 import '../lib/src/security/vanguard_core.dart';
 
 void main() {
   late Directory tempDir;
-  late SignEngine signEngine;
   late VanguardCore vanguardCore;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('gov_test_');
-    signEngine = SignEngine();
     vanguardCore = VanguardCore();
   });
 
@@ -20,33 +20,64 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  group('SignEngine Hardening (VUL-03, VUL-04)', () {
-    test('Debe fallar con una ruta de clave inexistente (Manejo de errores mejorado)', () async {
-      final bogusPath = p.join(tempDir.path, 'missing.xml');
-      expect(
-        () => signEngine.sign(challenge: 'test', files: 'a.dart', privateKeyXmlPath: bogusPath),
-        throwsA(isA<Exception>()),
-      );
+  group('Security Hardening S12-01 (SignEngine XML)', () {
+    late SignEngine engine;
+    final privateKeyXml = '''
+<RSAKeyValue>
+  <Modulus>mS1R6...==</Modulus>
+  <Exponent>AQAB</Exponent>
+  <P>7u...</P>
+  <Q>4v...</Q>
+  <DP>...</DP>
+  <DQ>...</DQ>
+  <InverseQ>...</InverseQ>
+  <D>dK...</D>
+</RSAKeyValue>''';
+
+    final publicKeyXml = '''
+<RSAKeyValue>
+  <Modulus>mS1R6...==</Modulus>
+  <Exponent>AQAB</Exponent>
+</RSAKeyValue>''';
+
+    setUp(() {
+      engine = SignEngine();
     });
 
-    test('El parser XML debe manejar espacios y saltos de línea (Robustez)', () async {
-      final keyFile = File(p.join(tempDir.path, 'test_key.xml'));
-      await keyFile.writeAsString('''
-<RSAKeyValue>
-  <Modulus>
-    s7v6+v//v78=
-  </Modulus>
-  <Exponent>AQAB</Exponent>
-</RSAKeyValue>
-''');
+    test('SignEngine: Firma y Verifica con XML robusto', () async {
+      final challenge = Uint8List.fromList(utf8.encode('TEST-CHALLENGE'));
+      
+      // Sign
+      final signature = await engine.sign(
+        challenge: challenge,
+        privateKeyXml: privateKeyXml,
+      );
+      
+      expect(signature, isNotNull);
+      expect(signature.isNotEmpty, isTrue);
 
-      // Verificamos que no lance excepción al leer el XML con espacios de forma robusta
-      expect(await signEngine.verify(
-        challenge: 'c', 
-        files: 'f', 
-        signatureBase64: 'c2ln', 
-        publicKeyXmlPath: keyFile.path
-      ), isFalse); 
+      // Verify
+      final isValid = await engine.verify(
+        challenge: challenge,
+        signature: signature,
+        publicKeyXml: publicKeyXml,
+      );
+      
+      expect(isValid, isTrue);
+    });
+
+    test('SignEngine: Manejo de errores en XML corrupto', () async {
+      bool caught = false;
+      try {
+        await engine.sign(
+          challenge: Uint8List(16),
+          privateKeyXml: '<Invalid>XML</Invalid>',
+        );
+      } catch (e) {
+        print('DEBUG: Capturada excepción: $e');
+        caught = true;
+      }
+      expect(caught, isTrue);
     });
   });
 

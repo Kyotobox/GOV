@@ -137,61 +137,153 @@
     },
     {
       "id": "S12-INTEGRITY",
-      "name": "Integridad Criptográfica",
-      "status": "PENDING",
+      "name": "Integridad Criptográfica & Vault",
+      "status": "DONE",
       "goal": "Blindaje de firmas y validaciones cruzadas (Prioridad 1).",
       "tasks": [
         {
           "id": "TASK-DPI-S12-01",
           "label": "SEC",
           "desc": "SignEngine & CLI Key Hardening (VUL-01, VUL-02)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S12-02",
           "label": "SEC",
           "desc": "Cross-Validation & Manifest Signatures (VUL-07, VUL-08)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     },
     {
       "id": "S13-IMMUTABILITY",
       "name": "Inmutabilidad y Anti-Evasión",
-      "status": "PENDING",
+      "status": "DONE",
       "goal": "Prevenir Path Traversal, ZipSlip y envenenamiento de Ledger (Prioridad 2).",
       "tasks": [
         {
           "id": "TASK-DPI-S13-01",
           "label": "GOV",
           "desc": "ForensicLedger Mutex & Anchoring (VUL-11, VUL-12)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S13-02",
           "label": "SEC",
           "desc": "Path Traversal & ZipSlip Protection (VUL-14, VUL-19)",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S13-03",
           "label": "SEC",
           "desc": "Orphan Substring Bypass Fix (VUL-09)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     },
     {
       "id": "S14-ERGONOMICS",
       "name": "Deuda Técnica y Pulido",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Mejoras operativas no bloqueantes (Prioridad 3).",
       "tasks": [
         {
           "id": "TASK-DPI-S14-01",
           "label": "PERF",
           "desc": "Code Debt & Polling (VUL-03, VUL-04, VUL-23)",
-          "status": "IN_PROGRESS"
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S15-SYMBIOSIS",
+      "name": "Generador de Contexto",
+      "status": "IN_PROGRESS",
+      "goal": "Implementar 'gov context' para focalización de la IA.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S15-01",
+          "label": "AI-CORE",
+          "desc": "Generador de Contexto (gov context)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S15-02",
+          "label": "OPS",
+          "desc": "Ganchos Nativos Inescapables (gov hook install)",
+          "status": "DONE"
+        },
+        {
+          "id": "TASK-DPI-S15-03",
+          "label": "CLI",
+          "desc": "Simulador de Vuelo / Dry-Run (gov act --dry-run)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "S16-FACTORY-OPS",
+      "name": "Automatización de Operaciones",
+      "status": "PENDING",
+      "goal": "Auto-Commit semántico y trazabilidad total.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S16-01",
+          "label": "OPS",
+          "desc": "Auto-Commit Semántico y Estandarizado",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S16-02",
+          "label": "SEC",
+          "desc": "Kill-Switch de Sesiones Zombie",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S16-03",
+          "label": "PERF",
+          "desc": "Mecanismo Anti-Loop (CLI Rate Limiting)",
+          "status": "PENDING"
+        }
+      ]
+    },
+    {
+      "id": "S17-RELIABILITY",
+      "name": "Integridad de Pruebas (TestGuard)",
+      "status": "PENDING",
+      "goal": "Integrar ejecución obligatoria de tests en el baseline.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S17-01",
+          "label": "QA",
+          "desc": "TestGuard Integration",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S17-02",
+          "label": "SEC",
+          "desc": "Reconstitution Engine (gov restore)",
+          "status": "PENDING"
+        }
+      ]
+    },
+    {
+      "id": "S18-UNIVERSAL-GOV",
+      "name": "Reporteo Avanzado y Roles",
+      "status": "PENDING",
+      "goal": "Generación de reportes ejecutivos con atribución de roles.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S18-01",
+          "label": "ARCH",
+          "desc": "Dynamic Scope Engine (gov.yaml)",
+          "status": "PENDING"
+        },
+        {
+          "id": "TASK-DPI-S18-02",
+          "label": "GOV",
+          "desc": "Advanced Reporting (gov report with Roles)",
+          "status": "PENDING"
         }
       ]
     }

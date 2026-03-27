@@ -15,6 +15,7 @@ dependencies:
   crypto: ^3.0.3          # SHA-256 para Signed Pulse / ChainedLog
   convert: ^3.1.1         # Base64 encoding para firmas RSA
   archive: ^4.0.9
+  xml: ^6.3.0
 
 dev_dependencies:
   lints: ^6.0.0

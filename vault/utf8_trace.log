@@ -1,0 +1,33 @@
+﻿[GOV] Executing command: baseline
+--- [BASELINE] SELLADO FORMAL DE KERNEL ---
+--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---
+DEBUG: Abriendo log en C:\Users\Ruben\Documents\antigravity_dpi\vault\audit.log
+DEBUG: [VAULT-LOAD] Claves cargadas: 1
+DEBUG: [VAULT-LOAD] Probando clave: C:\Users\Ruben\Documents\antigravity_dpi\vault/po_public.xml
+  [!] WARNING: No se encontr├│ clave p├║blica del PO. Omitiendo validaci├│n de firma de manifiesto.
+  [OK] backlog.json
+  [OK] VISION.md
+  [OK] GEMINI.md
+  [OK] COMMANDS.md
+  [OK] CHANGELOG.md
+  [CORRUPT] task.md
+  [CORRUPT] pubspec.yaml
+[ΓÇ╝∩╕Å] CRITICAL: Violaci├│n de Integridad detectada.
+  [Γ¥î] COMPLIANCE-FAIL: Compliance Violation: REFERENTIAL-FAIL: TASK-DPI-S12-01.md es inv├ílido o no existe.
+[CRITICAL] Error inesperado en audit: Bad state: StreamSink is closed
+#0      _StreamSinkImpl.add (dart:io/io_sink.dart:153:7)
+#1      _IOSinkImpl.writeln (dart:io/io_sink.dart:313:5)
+#2      runAudit (file:///C:/Users/Ruben/Documents/antigravity_dpi/bin/antigravity_dpi.dart:180:18)
+<asynchronous suspension>
+#3      runBaseline (file:///C:/Users/Ruben/Documents/antigravity_dpi/bin/antigravity_dpi.dart:426:3)
+<asynchronous suspension>
+#4      main (file:///C:/Users/Ruben/Documents/antigravity_dpi/bin/antigravity_dpi.dart:72:7)
+<asynchronous suspension>
+
+[CRITICAL] KERNEL-VIOLATION: session.lock MAC inv├ílido o inexistente.
+[GOV] Executing command: audit
+--- [AUDIT] INICIANDO ESCANEO DE INTEGRIDAD ---
+DEBUG: Abriendo log en C:\Users\Ruben\Documents\antigravity_dpi\vault\audit.log
+DEBUG: [VAULT-LOAD] Claves cargadas: 1
+DEBUG: [VAULT-LOAD] Probando clave: C:\Users\Ruben\Documents\antigravity_dpi\vault/po_public.xml
+[CRITICAL] KERNEL-VIOLATION: La firma del manifiesto (kernel.hashes.sig) es INV├üLIDA.

@@ -1,63 +1,60 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
-import 'vanguard_core.dart';
 import 'sign_engine.dart';
 
 /// VanguardWatcher: Headless implementation of the Vanguard challenge watcher.
+/// This service monitors the vault/intel directory for challenges and signs them automatically.
 class VanguardWatcher {
   final SignEngine _signer = SignEngine();
-  final String basePath;
-  final String privateKeyPath;
-
-  VanguardWatcher({required this.basePath, required this.privateKeyPath});
-
-  /// Starts watching for challenges and AUTO-SIGNS them if it is a tactical change.
-  /// (In a real scenario, it should prompt the user, but here it simulates the PO's approval).
-  void start() {
+  
+  /// Starts watching the specified directory for challenge files.
+  /// Returns a [StreamSubscription] to allow manual lifecycle control (VUL-23).
+  Future<StreamSubscription<WatchEvent>> start({
+    required String basePath, 
+    required String privateKeyPath
+  }) async {
     final intelDir = p.join(basePath, 'vault', 'intel');
+    print('[VANGUARD] Iniciando observador en: $intelDir');
+    
     final watcher = DirectoryWatcher(intelDir);
-
-    watcher.events.listen((event) async {
-      if (event.path.endsWith('challenge.json') && 
-          (event.type == ChangeType.ADD || event.type == ChangeType.MODIFY)) {
-        
-        print('[VANGUARD] New challenge detected: ${event.path}');
-        await _processChallenge(event.path);
+    
+    final subscription = watcher.events.listen((event) async {
+      if (event.type == ChangeType.ADD && event.path.endsWith('challenge.json')) {
+        print('[VANGUARD] Nuevo desafío detectado: ${event.path}');
+        try {
+          await _handleChallenge(event.path, privateKeyPath, basePath);
+        } catch (e) {
+          stderr.writeln('[VANGUARD-CRITICAL] Fallo catastrófico al procesar desafío: $e');
+        }
       }
     });
 
-    print('[VANGUARD] Watching for challenges in $intelDir...');
+    return subscription;
   }
 
-  Future<void> _processChallenge(String challengePath) async {
-    final file = File(challengePath);
+  Future<void> _handleChallenge(String challengePath, String privateKeyPath, String basePath) async {
     try {
-      final content = await file.readAsString();
+      final challengeFile = File(challengePath);
+      if (!await challengeFile.exists()) return;
+
+      final content = await challengeFile.readAsString();
       final data = jsonDecode(content);
       
-      final challenge = data['challenge'];
-      final files = data['files'];
-      final level = data['level'];
+      final challenge = data['challenge'] as String;
+      final level = data['level'] as String;
 
       print('[VANGUARD] Challenge: $challenge | Level: $level');
 
-      if (level != 'TACTICAL') {
-        stdout.write('\n[!] PRECAUCIÓN: Desafío de nivel $level detectado.\n');
-        stdout.write('¿Autorizar firma de desafío [y/N]? ');
-        final response = stdin.readLineSync();
-        if (response == null || (response.trim().toLowerCase() != 'y' && response.trim().toLowerCase() != 'yes')) {
-          print('[VANGUARD] Firma ABORTADA por el usuario.');
-          return;
-        }
-      }
-
-      final signature = await _signer.sign(
-        challenge: challenge,
-        files: files,
-        privateKeyXmlPath: privateKeyPath,
+      final privateKeyXml = await File(privateKeyPath).readAsString();
+      final signatureBytes = await _signer.sign(
+        challenge: Uint8List.fromList(utf8.encode(challenge)),
+        privateKeyXml: privateKeyXml,
       );
+      final signature = base64Encode(signatureBytes);
 
       final sigPath = p.join(basePath, 'vault', 'intel', 'signature.json');
       final sigPayload = {
@@ -67,10 +64,12 @@ class VanguardWatcher {
       };
 
       await File(sigPath).writeAsString(jsonEncode(sigPayload));
-      print('[VANGUARD] CHALLENGE SIGNED ✅ (Native RSA)');
-
+      print('[VANGUARD] Firma generada y persistida en: $sigPath');
+      
     } catch (e) {
-      print('[VANGUARD] Error processing challenge: $e');
+      // VUL-04: Ensure background service errors are NOT swallowed silently
+      stderr.writeln('[VANGUARD-ERROR] Error en el flujo de firma: $e');
+      rethrow;
     }
   }
 }
