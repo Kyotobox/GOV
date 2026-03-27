@@ -224,33 +224,33 @@
     {
       "id": "S16-FACTORY-OPS",
       "name": "Automatización de Operaciones",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Auto-Commit semántico y trazabilidad total.",
       "tasks": [
         {
           "id": "TASK-DPI-S16-01",
           "label": "OPS",
           "desc": "Auto-Commit Semántico y Estandarizado",
-          "status": "IN_PROGRESS"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S16-02",
           "label": "SEC",
           "desc": "Kill-Switch de Sesiones Zombie",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "TASK-DPI-S16-03",
           "label": "PERF",
           "desc": "Mecanismo Anti-Loop (CLI Rate Limiting)",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     },
     {
       "id": "S17-RELIABILITY",
       "name": "Integridad de Pruebas (TestGuard)",
-      "status": "PENDING",
+      "status": "IN_PROGRESS",
       "goal": "Integrar ejecución obligatoria de tests en el baseline.",
       "tasks": [
         {

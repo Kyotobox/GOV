@@ -42,6 +42,16 @@ class IntegrityEngine {
         manifest[relativePath] = await _calculateHash(file);
       }
     }
+
+    // Include critical governance documents in the root
+    final rootDocs = ['VISION.md', 'GEMINI.md', 'backlog.json'];
+    for (final doc in rootDocs) {
+      final file = File(p.join(basePath, doc));
+      if (await file.exists()) {
+        manifest[doc] = await _calculateHash(file);
+      }
+    }
+
     return manifest;
   }
 

@@ -97,3 +97,9 @@
 | 2026-03-27 01:56 | S15-SYMBIOSIS | 2843bc3bc4537d7ea115f049d62813c73f27dc4e406fe28a044774b2c1ddf84c | BASE | BASELINE | Baseline sealed. Git: 2cb4217 |
 | 2026-03-27 01:59 | S16-FACTORY-OPS | fe3322e03607beb909bf1b19c7a100518172bf6fc403c33d5e9cd40a90f1a4ad | SNAP | HANDOVER | Handover completed. SHS: 2%. Git: 0057455 |
 | 2026-03-27 01:59 | S16-FACTORY-OPS | 0430c2ad3c2e96c7b49cbb6a342c2af6543e2daffffebb114cd7cbc4cadfc69c | SNAP | TAKEOVER | Takeover success. Inherited CP: 2.0 |
+| 2026-03-27 02:00 | S16-FACTORY-OPS | 0005734a968fde05b9191cae98ff1f43d3e66a4d0a18d6fc86fd7027e391bf40 | BASE | BASELINE | Baseline sealed. Git: 0057455 |
+| 2026-03-27 02:00 | S04-GENERAL | cf167f8c91cfaff6a8b7ad42e53726b61a137fe7afd2dc80b80c210d13f02866 | SNAP | HANDOVER | Handover completed. SHS: 2%. Git: e33afb3 |
+| 2026-03-27 02:03 | S04-GENERAL | c019a0b16354840cb33cd73ba28f0c31c8958f9a01031e763ce4d61c62907ecc | SNAP | TAKEOVER | Takeover success. Inherited CP: 2.0 |
+| 2026-03-27 02:04 | GATE-RED | 188c5c842060878fb2954a2d68dd0b1abb4acab005d191c3fa040c062a52059d | ALERT | TEST-FAIL | Pruebas unitarias fallidas durante el baseline. |
+| 2026-03-27 02:05 | GATE-RED | 936fc0f12a4de8a228854c60a018eeca51acd2a4e439c4b39d11f8e6b259358e | SNAP | RESTORE | Reconstitución manual de 1 archivos. |
+| 2026-03-27 02:08 | GATE-RED | f2982bf215848cc52dfdfd8b55966d746286b604ec3999b1d05dccf49ff65771 | SNAP | RESTORE | Reconstitución manual de 1 archivos. |
