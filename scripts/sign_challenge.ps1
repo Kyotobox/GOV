@@ -23,9 +23,9 @@ try {
         signature = $B64
         challenge = $Challenge
         timestamp = (Get-Date).ToString("o")
-    } | ConvertTo-Json
+    } | ConvertTo-Json -Compress
     
-    $Payload | Set-Content $SigPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($SigPath, $Payload)
     Write-Host "FIRMADO OK"
 } catch {
     Write-Error "ERROR AL FIRMAR: $_"
