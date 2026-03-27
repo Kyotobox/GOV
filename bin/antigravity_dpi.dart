@@ -153,17 +153,17 @@ Future<void> _runBaseline(String basePath, String message) async {
   // S24-01: BLACK-GATE Trigger
   final coreChangeId = await _detectCoreChanges(basePath);
   String effectiveLevel = 'STRATEGIC-GOLD';
-  String challengeId = '';
+  String? blackGateId;
 
   if (coreChangeId != null) {
      effectiveLevel = 'BLACK-GATE';
-     challengeId = coreChangeId;
+     blackGateId = coreChangeId;
      print('[!] ALERTA BLACK-GATE: Cambios en archivos del núcleo detectados.');
   }
 
   // --- [NONCE PERSISTENCE] ---
   final challengeFile = File(p.join(basePath, 'vault', 'intel', 'challenge.json'));
-  String finalChallengeId = challengeId;
+  String finalChallengeId = blackGateId ?? '';
   
   if (challengeFile.existsSync() && coreChangeId == null) {
     try {
@@ -180,23 +180,14 @@ Future<void> _runBaseline(String basePath, String message) async {
 
   if (finalChallengeId.isEmpty) {
     // 1. Issue Challenge (S22 Refactor: Use library signature)
-    final issuedId = await vanguard.issueChallenge(
+    finalChallengeId = await vanguard.issueChallenge(
       level: effectiveLevel,
       project: 'antigravity_dpi',
       files: swelling.files,
       basePath: basePath,
       description: message,
+      forcedId: blackGateId,
     );
-    finalChallengeId = issuedId;
-  }
-  
-  // Si fue BLACK-GATE, forzamos ese ID en el JSON
-  if (coreChangeId != null) {
-     final challengeData = jsonDecode(await challengeFile.readAsString());
-     challengeData['challenge'] = challengeId;
-     challengeData['level'] = 'BLACK-GATE';
-     await challengeFile.writeAsString(jsonEncode(challengeData));
-     finalChallengeId = challengeId;
   }
 
   // 3. Wait for Verification

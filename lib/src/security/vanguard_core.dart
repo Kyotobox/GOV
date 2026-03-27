@@ -14,12 +14,13 @@ class VanguardCore {
     required List<String> files,
     required String basePath,
     String description = '',
+    String? forcedId,
   }) async {
     final random = Random.secure();
     final nonce = List<int>.generate(16, (i) => random.nextInt(256));
     final nonceHex = nonce.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
     
-    final challengeId = 'AUTH-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-$nonceHex';
+    final challengeId = forcedId ?? 'AUTH-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-$nonceHex';
     final intelDir = p.join(basePath, 'vault', 'intel');
     final challengeFile = File(p.join(intelDir, 'challenge.json'));
 
