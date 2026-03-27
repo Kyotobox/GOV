@@ -11,7 +11,6 @@ void main() async {
   
   print('Signer loop started. Waiting for challenge...');
   
-  // Wait up to 60 seconds
   for (int i = 0; i < 600; i++) {
     if (await challengeFile.exists()) {
       print('Challenge detected. Signing...');
@@ -23,7 +22,15 @@ void main() async {
         }
         final challengeData = jsonDecode(content);
         final challengeString = challengeData['challenge'];
-        final privateKeyXml = await privKeyFile.readAsString();
+        
+        // NORMALIZATION: Extract only <RSAKeyValue>...</RSAKeyValue>
+        final rawXml = await privKeyFile.readAsString();
+        final match = RegExp(r'<RSAKeyValue>.*?</RSAKeyValue>', dotAll: true).firstMatch(rawXml);
+        if (match == null) {
+          print('Error: <RSAKeyValue> not found in private key file.');
+          return;
+        }
+        final privateKeyXml = match.group(0)!;
         
         final engine = SignEngine();
         final signature = await engine.sign(
@@ -38,12 +45,11 @@ void main() async {
         }));
         
         print('DONE: signature.json generated with PRODUCTION KEY (ID: ${challengeString.substring(0,8)}).');
-        return; // Success
+        return; 
       } catch (e) {
         print('Error during sign: $e. Retrying...');
       }
     }
     await Future.delayed(Duration(milliseconds: 100));
   }
-  print('ERROR: Timeout waiting for challenge.');
 }
