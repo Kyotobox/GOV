@@ -366,6 +366,8 @@ Future<void> _generateRecoverySeed(String basePath) async {
   print('║  ${seed.padRight(50)}║');
   print('╚════════════════════════════════════════════════════╝');
   print('');
+  print('[ACTION] Presiona ENTER una vez hayas copiado el SEED para finalizar.');
+  stdin.readLineSync();
 }
 
 Future<void> _runAuditSimulateTamper(String basePath) async {
