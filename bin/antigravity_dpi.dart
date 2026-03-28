@@ -176,23 +176,9 @@ Future<void> _runBaseline(String basePath, String message) async {
      print('[!] ALERTA BLACK-GATE: Cambios en archivos del núcleo detectados.');
   }
 
-  // --- [NONCE PERSISTENCE] ---
-  final challengeFile = File(p.join(basePath, 'vault', 'intel', 'challenge.json'));
+  // --- [S24-04: RECOVERY-SEED PHASE] ---
   String finalChallengeId = blackGateId ?? '';
   
-  if (challengeFile.existsSync() && coreChangeId == null) {
-    try {
-      final challengeData = jsonDecode(await challengeFile.readAsString());
-      final challengeTimestamp = DateTime.parse(challengeData['timestamp']);
-      
-      // Si el desafío tiene menos de 10 minutos, lo RE-UTILIZAMOS para evitar loop
-      if (DateTime.now().difference(challengeTimestamp).inMinutes < 10) {
-        finalChallengeId = challengeData['challenge'];
-        print('[INFO] Reutilizando desafío existente para evitar ID-Loop (Expira en ${10 - DateTime.now().difference(challengeTimestamp).inMinutes}m).');
-      }
-    } catch (_) { /* Fallback a nuevo desafío */ }
-  }
-
   if (finalChallengeId.isEmpty) {
     // 1. Issue Challenge (S22 Refactor: Use library signature)
     finalChallengeId = await vanguard.issueChallenge(
