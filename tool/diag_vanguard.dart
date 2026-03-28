@@ -19,7 +19,7 @@ void main() async {
   
   final challengeId = await vanguard.issueChallenge(
     level: 'TACTICAL-ORANGE',
-    project: 'antigravity-dpi',
+    project: 'antigravity_dpi',
     files: ['DIAGNOSTIC_TEST.bin'],
     basePath: basePath,
     description: 'TEST DE COMUNICACIÓN BÁSICA (v5.2-DPI)',
