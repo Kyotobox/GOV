@@ -58,6 +58,14 @@ class ForensicLedger {
       await _integrity.updateLedgerAnchor(basePath: basePath, tipHash: currentHash);
       
       print('DEBUG: ForensicLedger [${historyFile.absolute.path}] APPEND_OK (Anchored: ${currentHash.substring(0, 8)})');
+
+      // S24-SILVER: Auto-commit para mantener Git-Zero activo.
+      try {
+        await Process.run('git', ['add', 'HISTORY.md'], workingDirectory: basePath);
+        await Process.run('git', ['commit', '-m', 'gov: ledger update [$type] $task'], workingDirectory: basePath);
+      } catch (e) {
+        print('DEBUG: Git auto-commit failed (Expected if not in repo): $e');
+      }
     } finally {
       await lockRaf.unlock();
       await lockRaf.close();

@@ -6,3 +6,6 @@ build/
 session.lock
 gov.exe
 gov_oracle.exe
+vault/*.hash
+tool/
+output_baseline.txt

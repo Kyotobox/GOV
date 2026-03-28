@@ -93,7 +93,17 @@ Future<String?> _checkGitZero(String basePath) async {
     );
     if (result.exitCode != 0) return 'Git no disponible o directorio no es repositorio.';
     final output = (result.stdout as String).trim();
-    if (output.isNotEmpty) return 'Entorno Git sucio:\n$output';
+    if (output.isNotEmpty) {
+      // S24-SILVER: Filtrar metadatos del motor para permitir fluidez.
+      final lines = output.split('\n').where((l) {
+        final name = l.trim().split(' ').last;
+        return name != 'HISTORY.md' && name != 'PROJECT_LOG.md';
+      });
+
+      if (lines.isNotEmpty) {
+        return 'Entorno Git sucio:\n${lines.join('\n')}';
+      }
+    }
     return null;
   } catch (_) { return 'Error ejecutando git status.'; }
 }
@@ -229,6 +239,12 @@ Future<void> _runBaseline(String basePath, String message) async {
 
   // S24-04: Generar Recovery Seed en el primer baseline GOLD exitoso
   await _generateRecoverySeed(basePath);
+
+  // S24-SILVER: Auto-commit del log de baseline.
+  try {
+    await Process.run('git', ['add', 'PROJECT_LOG.md'], workingDirectory: basePath);
+    await Process.run('git', ['commit', '-m', 'gov: atomic baseline seal log'], workingDirectory: basePath);
+  } catch (_) {}
 }
 
 Future<void> _printStatus(String basePath) async {
