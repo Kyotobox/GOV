@@ -12,3 +12,4 @@
 | 2026-03-30 05:55 | ARCH | S24-GOLD | de68502e2dbc8380f2210cdc4b4bc250f2ccb521aab908819aa4715970959d09 | INIT | DPI-INIT | Nuevo proyecto creado: TestProject en C:\Users\Ruben\AppData\Local\Temp\dpi_test_caf8559a\new_bunker |
 | 2026-03-30 05:56 | ARCH | S24-GOLD | 105ff7efe2ab8d4ce471c5dde00b3c0b17b900d132657508a95684ebff000d0b | INIT | DPI-INIT | Nuevo proyecto creado: New Project en test_proj_manual |
 | 2026-03-30 05:57 | ARCH | S24-GOLD | 7f4afea6104e50759a5d1607cb56353a81830ac83904c11479c8e50f35deeeb4 | INIT | DPI-INIT | Nuevo proyecto creado: New Project en test_proj_man |
+| 2026-03-30 05:58 | ARCH | S24-GOLD | 314e1157c84470b090561d15310054dbdce8b6a591bbbfb03687fa4049f417c4 | INIT | DPI-INIT | Nuevo proyecto creado: Test en C:/Users/Ruben/Documents/antigravity_dpi/test_proj_man2 |
