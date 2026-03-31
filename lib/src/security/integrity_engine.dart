@@ -58,6 +58,9 @@ class IntegrityEngine {
 
   /// SSSoT: Verifies the tool itself against vault/self.hashes (VUL-01).
   Future<bool> verifySelf({required String toolRoot}) async {
+    // S24-GOLD: Bypass completo para entorno de desarrollo
+    if (Platform.environment['DPI_GOV_DEV'] == 'true') return true;
+
     // 1. Verificar ADN Binario si existe gov_hash.sig
     final isBinaryIntact = await verifyBinaryDNA(toolRoot: toolRoot);
     if (!isBinaryIntact) return false;
@@ -88,6 +91,9 @@ class IntegrityEngine {
 
   /// S104-DNA: Real-Time Binary SHA-256 Validation.
   Future<bool> verifyBinaryDNA({required String toolRoot}) async {
+    // S24-GOLD: Bypass para entorno de desarrollo
+    if (Platform.environment['DPI_GOV_DEV'] == 'true') return true;
+
     // S24-GOLD: Localización dinámica del binario para entornos distribuidos
     String exePath = p.join(toolRoot, 'gov.exe');
     if (!File(exePath).existsSync()) {
@@ -104,8 +110,8 @@ class IntegrityEngine {
       // Fallback para búsqueda en raíz de proyecto
       final altSig = File(p.join(toolRoot, 'vault', 'intel', 'gov_hash.sig'));
       if (!altSig.existsSync()) {
-         print('\x1B[33m[WARN] ALARMA DE ADN: Firma maestra (gov_hash.sig) no encontrada en rutas estándar.\x1B[0m');
-         return true; // No bloqueamos si no hay firma (fase de transición)
+         print('\x1B[31m[CRITICAL] ALARMA DE ADN: Firma maestra (gov_hash.sig) no encontrada. Integridad comprometida.\x1B[0m');
+         return false; 
       }
       return _checkDNA(exeFile, altSig);
     }

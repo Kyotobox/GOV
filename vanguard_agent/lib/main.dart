@@ -28,7 +28,7 @@ class VanguardElite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanguard Elite 8.0.0',
+      title: 'Vanguard Elite 8.1.5',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -65,7 +65,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   int _zombies = 0;
   String _sprintId = 'WAITING';
   String _activeTaskId = '---';
-  String _activeProjectVersion = 'v8.0.0'; // [S25-07] Versión dinámica
+  String _activeProjectVersion = 'v8.1.5'; // [S25-07]
   String _lastPushDate = '---';  // [S25-08]
   bool _pushIsStale = false;     // [S25-08]
   bool _driftAlert = false;
@@ -152,6 +152,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   Future<void> _loadSettings() async {
     final oracleRoot = _resolveOracleRoot();
     final masterFleetPath = p.join(oracleRoot, 'vault', 'intel', 'fleet_registry.json');
+    final logFile = File(p.join(oracleRoot, 'vanguard_crash.log'));
     
     try {
       final fleetFile = File(masterFleetPath);
@@ -161,34 +162,59 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         final List<dynamic> bunkers = data['bunkers'] ?? data['projects'] ?? [];
         _projects = bunkers.map((e) {
           final bunker = Project.fromJson(e);
+          // Priorizar po_private.xml para gobernanza de KYOTOBOX
+          final bool isGov = bunker.name.contains('GOV') || bunker.rootPath.contains('antigravity_dpi');
           return Project(
             id: bunker.id,
             name: bunker.name,
             rootPath: bunker.rootPath,
-            keyPath: bunker.rootPath.contains('Base2') 
-              ? p.join(bunker.rootPath, 'vault', 'intel', 'signature_history.json')
-              : 'root',
+            keyPath: isGov 
+              ? p.join(oracleRoot, 'vault', 'po_private.xml')
+              : p.join(bunker.rootPath, 'vault', 'intel', 'signature_history.json'),
           );
         }).toList();
         
         // Agregar el Oráculo dinámicamente si no está
         if (!_projects.any((p) => p.isGovMode)) {
-          _projects.add(Project(id: 'gov', name: 'KYOTOBOX - GOV', rootPath: oracleRoot, keyPath: 'root'));
+          _projects.add(Project(
+            id: 'gov', 
+            name: 'KYOTOBOX - GOV', 
+            rootPath: oracleRoot, 
+            keyPath: p.join(oracleRoot, 'vault', 'po_private.xml')
+          ));
         }
       } else {
-        // Fallback sin hardcoding
+        // Fallback robusto al Oracle Root
         _projects = [
-          Project(id: 'gov', name: 'KYOTOBOX - GOV', rootPath: oracleRoot, keyPath: 'root')
+          Project(
+            id: 'gov', 
+            name: 'KYOTOBOX - GOV', 
+            rootPath: oracleRoot, 
+            keyPath: p.join(oracleRoot, 'vault', 'po_private.xml')
+          )
         ];
       }
-    } catch (e) {
-      debugPrint('[VANGUARD-FLEET] Load error: $e');
+    } catch (e, stack) {
+      debugPrint('[VANGUARD-FATAL] Launch error: $e');
+      try {
+        await logFile.writeAsString('[${DateTime.now().toIso8601String()}] ERROR: $e\nSTACK: $stack\n');
+      } catch (_) {}
+      
       _projects = [
-        Project(id: 'gov', name: 'KYOTOBOX - GOV', rootPath: oracleRoot, keyPath: 'root')
+        Project(
+          id: 'gov', 
+          name: 'KYOTOBOX - GOV', 
+          rootPath: oracleRoot, 
+          keyPath: p.join(oracleRoot, 'vault', 'po_private.xml')
+        )
       ];
     }
 
-    if (mounted && _projects.isNotEmpty) _selectProject(_projects.first);
+    if (mounted && _projects.isNotEmpty) {
+      // Priorizar el núcleo de gobernanza para que sea el primero en mostrarse (V8.0)
+      final gov = _projects.firstWhere((p) => p.isGovMode, orElse: () => _projects.first);
+      _selectProject(gov);
+    }
   }
 
   void _selectProject(Project project) {
@@ -364,7 +390,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
             }
 
             // [S25-07] Leer versión del backlog
-            final version = data['version'] ?? data['kernel_version'] ?? 'v8.0.0';
+            final version = data['version'] ?? data['kernel_version'] ?? 'v8.1.5';
             _activeProjectVersion = version;
             
             // [S120] Calcular Deuda Pendiente

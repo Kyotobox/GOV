@@ -24,51 +24,48 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
-    test('calculatePulse should return expected fields in detail for v5.4', () async {
+    test('calculatePulse should return expected fields in detail for v8.2', () async {
       // 1. Create a "recent" file
       final libFile = File(p.join(tempDir.path, 'lib', 'main.dart'));
       await libFile.writeAsString('void main() {}');
       
-      // 2. Calculate pulse
+      // 2. Setup atomic counters
+      final intelDir = Directory(p.join(tempDir.path, 'vault', 'intel'));
+      await intelDir.create(recursive: true);
+      await File(p.join(intelDir.path, 'session_turns.txt')).writeAsString('5');
+      
+      // 3. Calculate pulse
       final pulse = await engine.calculatePulse(tempDir.path);
       
-      // 3. Verify v5.4 fields
-      expect(pulse.detail.containsKey('cooling_relief'), isTrue);
-      expect(pulse.detail.containsKey('active_minutes'), isTrue);
-      expect(pulse.detail['time_tax'], isNotNull);
+      // 4. Verify v8.2 fields
+      expect(pulse.context.detail.containsKey('tool_load'), isTrue);
+      expect(pulse.context.detail.containsKey('ai_turns'), isTrue);
+      expect(pulse.bunker.detail.containsKey('dna_intact'), isTrue);
+      expect(pulse.bunker.detail.containsKey('integrity_penalty'), isTrue);
     });
 
-    test('calculatePulse should accurately reflect time_tax penalties', () async {
-      // Setup session_pulse with 30 active minutes
-      final pulseFile = File(p.join(tempDir.path, '.meta', 'session_pulse.json'));
-      await pulseFile.writeAsString('{"active_minutes": 30.0, "total_actions": 5}');
+    test('calculatePulse should accurately reflect atomic turns in CUS', () async {
+      final intelDir = Directory(p.join(tempDir.path, 'vault', 'intel'));
+      await intelDir.create(recursive: true);
+      await File(p.join(intelDir.path, 'session_turns.txt')).writeAsString('10');
       
       final pulse = await engine.calculatePulse(tempDir.path);
       
-      // timePenalty = (30 / 10).roundToDouble() = 3.0
-      expect(pulse.detail['time_tax'], 3.0);
+      // tool_load = 10 * 1.2 = 12.0
+      expect(pulse.context.detail['tool_load'], 12.0);
+      expect(pulse.context.cus, 12.0);
     });
 
-    test('calculatePulse should apply strategic relief if SHS > 70', () async {
-      // Mock high SHS by adding many actions or zombies if needed, 
-      // but let's just check the logic branch.
-      // We need currentShs > 70.
-      // currentBaseCp = toolCpValue + cpChats + cpEnvironment + timePenalty
-      // Let's create many zombies to force high SHS.
-      for (int i = 0; i < 30; i++) {
-        await File(p.join(tempDir.path, 'zombie_$i.tmp')).create();
-      }
+    test('calculatePulse should apply 70% penalty if DNA seal is missing', () async {
+      // 1. Crear un binario dummy en la raíz para forzar el check de ADN
+      await File(p.join(tempDir.path, 'gov.exe')).writeAsString('DUMMY BINARY');
       
-      // Also mark a task done
-      final taskFile = File(p.join(tempDir.path, 'task.md'));
-      await taskFile.writeAsString('# Tasks\n- [x] Done Task (TASK-1)');
-      
+      // 2. Calcular pulso usando tempDir como root real del búnker
       final pulse = await engine.calculatePulse(tempDir.path);
       
-      // SHS should be > 70 due to 30 zombies (30 * 1.5 = 45 CP) 
-      // plus environment (30 files / 18 * 100 / 2 = 83/2 = 41 CP) -> CP ~ 86 -> SHS ~ 172%
-      expect(pulse.saturation, greaterThan(70));
-      expect(pulse.detail['relief'], lessThan(0)); // Relief should be active
+      // BHI debe ser al menos 70 si dna_intact es false
+      expect(pulse.bunker.detail['dna_intact'], isFalse);
+      expect(pulse.bunker.bhi, greaterThanOrEqualTo(70.0));
     });
   });
 }

@@ -132,6 +132,21 @@ class TelemetryService {
     return turns;
   }
 
+  /// Increment chats atomically.
+  Future<int> incrementChats({required String basePath}) async {
+    final chatsFile = File(
+      p.join(basePath, 'vault', 'intel', 'chat_count.txt'),
+    );
+    int chats = 0;
+    if (await chatsFile.exists()) {
+      final content = await chatsFile.readAsString();
+      chats = int.tryParse(content.trim()) ?? 0;
+    }
+    chats++;
+    await chatsFile.writeAsString(chats.toString());
+    return chats;
+  }
+
   Future<double> _calculateSwelling(String basePath) async {
     final coreFiles = [
       'ops-gov.ps1',

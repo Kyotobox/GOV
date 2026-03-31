@@ -23,9 +23,14 @@ void main(List<String> args) async {
   final isDev = Platform.environment['DPI_GOV_DEV'] == 'true';
   
   // En binarios, toolRoot es la carpeta donde vive el .exe
-  final toolRoot = Platform.script.isScheme('file') 
-      ? p.dirname(Platform.script.toFilePath()) 
-      : p.dirname(Platform.resolvedExecutable);
+  // En desarrollo (dart run), subimos un nivel si estamos en 'bin/'
+  String toolRoot = Platform.script.isScheme('file') 
+      ? p.dirname(p.canonicalize(Platform.script.toFilePath()))
+      : p.dirname(p.canonicalize(Platform.resolvedExecutable));
+  
+  if (p.basename(toolRoot) == 'bin') {
+    toolRoot = p.dirname(toolRoot);
+  }
 
   if (!isDev && !await integrityCheck.verifySelf(toolRoot: toolRoot)) {
     print('\x1B[31m[STOP] Oraculo corrupto o sin sello de ADN. Operacion abortada.\x1B[0m');
@@ -46,7 +51,7 @@ void main(List<String> args) async {
       await _runBaseline(basePath, args.length > 1 ? args[1] : 'Manual Update');
       break;
     case 'takeover':
-      await runTakeover(basePath);
+      await runTakeover(basePath, args);
       break;
     case 'handover':
       await runHandover(basePath, args);

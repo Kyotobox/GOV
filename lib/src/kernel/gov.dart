@@ -8,6 +8,7 @@ import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
+import 'package:antigravity_dpi/src/version.dart';
 
 /// Base2 Governance Motor [DPI-GATE-GOLD]
 /// Hardened with Vanguard RSA-2048 Lock.
@@ -16,7 +17,7 @@ void main(List<String> args) async {
   final lockFile = File(p.join(basePath, '.meta', 'SESSION_LOCKED'));
 
   if (args.isEmpty) {
-    print('Base2 Governance Motor v8.0.0 [DPI-GATE-GOLD]');
+    print(kKernelBanner);
     print('Usage: gov <command> [options]');
     print('Commands: audit, status, act, baseline, takeover, handover, health, dashboard, prompt, sync-tasks, init, adopt, plan');
     exit(0);
@@ -44,7 +45,7 @@ void main(List<String> args) async {
       await _runBaseline(basePath, args.length > 1 ? args[1] : 'Manual Update');
       break;
     case 'takeover':
-      await runTakeover(basePath, forceLast: args.contains('--force-last'));
+      await runTakeover(basePath, args);
       break;
     case 'handover':
       await runHandover(basePath, args);
@@ -92,7 +93,7 @@ void main(List<String> args) async {
 }
 
 void _printHelp() {
-  print('=== [GOV] VANGUARD KERNEL v8.0.0 [DPI-GATE-GOLD] ===');
+  print('=== $kKernelBanner ===');
   print('Comandos Disponibles:');
   print('  help         : Muestra esta ayuda.');
   print('  status       : Estado global, SHS y tareas activas (CUS/BPI).');
@@ -150,7 +151,7 @@ Future<void> _runAudit(String basePath) async {
   print('Zombies:      ${zombies.length}');
   print('CUS (Context): ${pulse.context.cus.toStringAsFixed(1)}% [${pulse.context.cus < 90 ? 'NOMINAL' : 'CRITICAL'}]');
   print('BHI (Health):  ${pulse.bunker.bhi.toStringAsFixed(1)}% [${pulse.bunker.bhi < 90 ? 'SAFE' : 'DIRTY'}]');
-  print('intel_pulse.json: actualizado (v8.0 Dual)');
+  print('intel_pulse.json: actualizado ($kKernelVersion Dual)');
   print('----------------------------------------');
 
   if (pulse.context.cus > 85 || pulse.bunker.bhi > 90) {
@@ -189,6 +190,7 @@ Future<void> runAct(String basePath, List<String> args) async {
   pulse['total_actions'] = (pulse['total_actions'] ?? 0) + 1;
   if (args.contains('--chat')) {
     pulse['chats'] = (pulse['chats'] ?? 0) + 1;
+    await telemetry.incrementChats(basePath: basePath);
   }
 
   // Calcular fatiga y aplicar Guard de Saturación (Redline)
@@ -432,7 +434,7 @@ Future<void> _runDashboard(String basePath, {bool watch = false}) async {
   }
 
   // Comportamiento por defecto: Generar DASHBOARD.md
-  print('=== [GOV] DASHBOARD REGENERATOR v8.0 ===');
+  print('=== [GOV] DASHBOARD REGENERATOR $kKernelVersion ===');
   final swelling = await integrity.checkSwelling(basePath);
   final sizeMB = swelling.totalBytes / (1024 * 1024);
   final chatUuid = Platform.environment['VANGUARD_CHAT_UUID'] ?? 'UNKNOWN';
@@ -444,7 +446,8 @@ Future<void> _runDashboard(String basePath, {bool watch = false}) async {
   final bhiStatus = bhi < 70 ? '✅ SAFE' : (bhi < 90 ? '⚠️ DIRTY' : '🛑 CRITICAL');
 
   final content = '''
-# 🛡️ VANGUARD HUD: Centro de Mando v8.0.0 [DPI-GATE-GOLD]
+# 🛡️ VANGUARD HUD: Centro de Mando $kKernelVersion [DPI-GATE-GOLD]
+# Codename: $kKernelCodename
 > **Sesión Activa:** `$chatUuid`
 
 | Métrica | Valor | Estado | Dominio |
@@ -466,7 +469,7 @@ Future<void> _runDashboard(String basePath, {bool watch = false}) async {
   if (!destDir.existsSync()) destDir.createSync(recursive: true);
 
   await File(p.join(destDir.path, dashboardFilename)).writeAsString(content);
-  print('[SUCCESS] ${p.join(dashboardPath, dashboardFilename)} actualizado con métricas v8.0.');
+  print('[SUCCESS] ${p.join(dashboardPath, dashboardFilename)} actualizado con métricas $kKernelVersion.');
 }
 
 void _printTermHUD(DualPulseData pulse, dynamic swelling, String contextLine) {
@@ -489,7 +492,7 @@ void _printTermHUD(DualPulseData pulse, dynamic swelling, String contextLine) {
   }
 
   print('\x1B[1m┌──────────────────────────────────────────────────────────┐\x1B[0m');
-  print('\x1B[1m│ \x1B[35mVANGUARD HUD\x1B[0m [DPI-GATE-GOLD] v8.1.0-DEBT                 │');
+  print('\x1B[1m│ \x1B[35mVANGUARD HUD\x1B[0m [DPI-GATE-GOLD] $kKernelVersion                      │');
   print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
   print('│ \x1B[2mSESSION:\x1B[0m ${chatUuid.take(12)}... | \x1B[2mSTRAT:\x1B[0m KERNEL-8.1     │');
   print('│ \x1B[2mCONTEXT:\x1B[0m ${contextLine.take(48).padRight(48)} │');
@@ -685,7 +688,7 @@ Future<void> _printStatus(String basePath, {bool jsonOutput = false}) async {
   if (jsonOutput) {
     print(jsonEncode(status));
   } else {
-    print('=== [GOV] SYSTEM STATUS v8.0.0 ===');
+    print('=== [GOV] SYSTEM STATUS $kKernelVersion ===');
     print('Project: ${status['project']} | v${status['version']}');
     print('Sprint:  ${status['sprint']}');
     print('Context (CUS): ${status['cus']?.toStringAsFixed(1)}% | Tokens: ~${status['tokens']}');
@@ -748,8 +751,16 @@ Future<void> runSyncContext(String basePath, List<String> args) async {
   print(JsonEncoder.withIndent('  ').convert(result));
 }
 
-Future<void> runTakeover(String basePath, {bool forceLast = false}) async {
+Future<void> runTakeover(String basePath, List<String> args) async {
   print('=== [GOV] SESSION TAKEOVER ===');
+  
+  final forceLast = args.contains('--force-last');
+  String? cliUuid;
+  if (args.contains('--uuid')) {
+    final idx = args.indexOf('--uuid');
+    if (idx + 1 < args.length) cliUuid = args[idx + 1];
+  }
+
   final lockFile = File(p.join(basePath, '.meta', 'SESSION_LOCKED'));
   final bool wasClean = lockFile.existsSync();
   
@@ -760,19 +771,32 @@ Future<void> runTakeover(String basePath, {bool forceLast = false}) async {
   }
   
   final sessionLock = File(p.join(basePath, '.meta', 'session.lock'));
+  final relayFile = File(p.join(basePath, 'vault', 'intel', 'SESSION_RELAY.json'));
+  
   String? lastChatUuid;
   if (sessionLock.existsSync()) {
     try {
       final data = jsonDecode(sessionLock.readAsStringSync());
-      lastChatUuid = data['chat_uuid']?.toString(); // S24-GOLD: Forzado de String
+      lastChatUuid = data['chat_uuid']?.toString(); 
     } catch (_) {}
   }
 
   // Identificar sesión de Chat (Vanguard Engine)
   String currentChatUuid = Platform.environment['VANGUARD_CHAT_UUID'] ?? 'MANUAL-SESSION';
   
-  // S24-GOLD: Soporte para --force-last para automatizar el relevo
-  if (forceLast && lastChatUuid != null && currentChatUuid == 'MANUAL-SESSION') {
+  // Protocolo Identity Relay
+  if (cliUuid != null) {
+     print('[RELAY] Usando UUID proporcionado por comando: $cliUuid');
+     currentChatUuid = cliUuid;
+  } else if (relayFile.existsSync()) {
+     try {
+       final relayData = jsonDecode(relayFile.readAsStringSync());
+       if (relayData['chat_uuid'] != null) {
+         print('[RELAY] Recuperando identidad desde SESSION_RELAY.json: ${relayData['chat_uuid']}');
+         currentChatUuid = relayData['chat_uuid'];
+       }
+     } catch (_) {}
+  } else if (forceLast && lastChatUuid != null && currentChatUuid == 'MANUAL-SESSION') {
     print('[AUTO] Relevo forzado vía --force-last detectado. Usando ID anterior: $lastChatUuid');
     currentChatUuid = lastChatUuid;
   }
@@ -1019,17 +1043,36 @@ class DualPulseData {
 
 class ContextEngine {
   Future<ContextState> calculateCUS(String basePath) async {
+    final intelDir = p.join(basePath, 'vault', 'intel');
+    final turnsFile = File(p.join(intelDir, 'session_turns.txt'));
+    final chatsFile = File(p.join(intelDir, 'chat_count.txt'));
+    
+    int atomicTurns = 0;
+    int atomicChats = 0;
+
+    if (turnsFile.existsSync()) {
+      atomicTurns = int.tryParse(turnsFile.readAsStringSync().trim()) ?? 0;
+    }
+    if (chatsFile.existsSync()) {
+      atomicChats = int.tryParse(chatsFile.readAsStringSync().trim()) ?? 0;
+    }
+
     final pulseFile = File(p.join(basePath, '.meta', 'session_pulse.json'));
     Map<String, dynamic> pulse = {'total_actions': 0, 'chats': 0};
     if (pulseFile.existsSync()) {
       try { pulse = jsonDecode(pulseFile.readAsStringSync()); } catch (_) {}
     }
 
-    int trueAiTurns = 0;
-    int trueChatTurns = 0;
-    double toolCpValue = 0;
+    int trueAiTurns = atomicTurns;
+    int trueChatTurns = atomicChats;
+    
+    // Si los contadores atómicos son 0, intentar recuperar de session_pulse.json (Legacy)
+    if (trueAiTurns == 0) trueAiTurns = pulse['total_actions'] ?? 0;
+    if (trueChatTurns == 0) trueChatTurns = pulse['chats'] ?? 0;
 
-    // 1. Crawler de Logs (Vanguard Sync)
+    double toolCpValue = trueAiTurns * 1.2;
+
+    // 1. Crawler de Logs (Vanguard Sync - Opcional/Complementario)
     try {
       final userProfile = Platform.environment['USERPROFILE'];
       final currentChatUuid = Platform.environment['VANGUARD_CHAT_UUID'];
@@ -1039,31 +1082,33 @@ class ContextEngine {
         if (overviewFile.existsSync()) {
           final content = overviewFile.readAsStringSync();
           final lines = content.split('\n');
+          int crawlerTurns = 0;
+          double crawlerCp = 0;
           for (final line in lines) {
             if (line.contains('call:')) {
-              trueAiTurns++;
+              crawlerTurns++;
               if (line.contains('replace_file_content') || line.contains('write_to_file') || line.contains('multi_replace')) {
-                toolCpValue += 2.0;
+                crawlerCp += 2.0;
               } else if (line.contains('run_command') || line.contains('search_web')) {
-                toolCpValue += 1.5;
+                crawlerCp += 1.5;
               } else {
-                toolCpValue += 0.5;
+                crawlerCp += 0.5;
               }
-            } else if (line.trim().isNotEmpty) {
-              trueChatTurns++;
             }
+          }
+          // Si el crawler detecta más actividad, lo usamos como corrección al alza
+          if (crawlerTurns > trueAiTurns) {
+            trueAiTurns = crawlerTurns;
+            toolCpValue = crawlerCp;
           }
         }
       }
-    } catch (_) {
-      toolCpValue = (pulse['total_actions'] ?? 0) * 1.2;
-      trueChatTurns = pulse['chats'] ?? 0;
-    }
+    } catch (_) {}
 
-    // 2. Tokenizer Agile (Words * 1.3 - Vanguard v8.0 Standard)
-    int estimatedTokens = (toolCpValue * 300).toInt(); // Estimación interna por carga de herramienta
+    // 2. Tokenizer Agile (Vanguard v8.2 Standard)
+    int estimatedTokens = (toolCpValue * 300).toInt();
 
-    // 3. Protocolo de Amnistía (No hay alivio temporal ni estratégico para el contexto)
+    // 3. Fórmula Unificada (Base2 Compatible)
     final double finalCus = (toolCpValue + (trueChatTurns * 0.5)).clamp(0.0, 100.0);
 
     return ContextState(
@@ -1086,19 +1131,30 @@ class BunkerHealthEngine {
     final swelling = await integrity.checkSwelling(basePath);
     final zombies = await integrity.checkZombies(basePath);
 
-    // Métrica de Densidad (Relación con el búnker inmortal)
-    final double densityScore = (swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 50;
-    final double zombieScore = (zombies.length * 5.0); // 1 zombie = 5% de presión
+    // 1. Integridad Criptográfica (70% del peso)
+    final bool isSelfIntact = await integrity.verifySelf(toolRoot: basePath);
+    final double integrityScore = isSelfIntact ? 0.0 : 70.0;
 
-    final double finalBhi = (densityScore + zombieScore).clamp(0.0, 100.0);
+    // 2. Densidad (15% del peso)
+    // kMaxRootFiles = 20 (estándar v8)
+    final double densityScore = (swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 15.0;
+
+    // 3. Higiene / Zombies (15% del peso)
+    // 1 zombie = 3% de penalización (hasta un máximo de 5 zombies para cubrir el 15%)
+    final double zombieScore = (zombies.length * 3.0).clamp(0.0, 15.0);
+
+    final double finalBhi = (integrityScore + densityScore + zombieScore).clamp(0.0, 100.0);
 
     return BunkerHealthState(
       bhi: finalBhi,
       zombies: zombies.length,
       density: swelling.fileCount,
       detail: {
+        'dna_intact': isSelfIntact,
+        'integrity_penalty': integrityScore,
+        'density_penalty': densityScore.toStringAsFixed(1),
+        'zombie_penalty': zombieScore,
         'root_files': swelling.fileCount,
-        'root_bytes': swelling.totalBytes,
         'zombie_list': zombies.take(5).toList(),
       },
     );
@@ -1307,7 +1363,8 @@ Future<void> runInit(String basePath, List<String> args) async {
     return;
   }
 
-  final targetPath = args[1];
+  final unnormalizedPath = args[1];
+  final targetPath = p.canonicalize(p.absolute(unnormalizedPath));
   final targetDir = Directory(targetPath);
   String? projectName;
   String? visionText;
@@ -1548,7 +1605,9 @@ Future<void> runAdopt(String basePath, List<String> args) async {
     return;
   }
 
-  final targetPath = args[1];
+  final unnormalizedPath = args.length > 1 ? args[1] : Directory.current.path;
+  final targetPath = p.canonicalize(p.absolute(unnormalizedPath));
+  final targetDir = Directory(targetPath);
   final isDryRun = args.contains('--dry-run');
   final isCommit = args.contains('--commit');
   
@@ -1558,7 +1617,6 @@ Future<void> runAdopt(String basePath, List<String> args) async {
     if (idx + 1 < args.length) targetName = args[idx + 1];
   }
   targetName ??= p.basename(targetPath);
-  final targetDir = Directory(targetPath);
   final integrityCheck = IntegrityEngine();
   final isDev = Platform.environment['DPI_GOV_DEV'] == 'true';
   if (isDev) print('[DEBUG] GOV: bypass de integridad activo (DEV MODE)');
@@ -1824,6 +1882,20 @@ Future<void> _triggerDashboardSync(String basePath) async {
 Future<void> runSealDNA(String basePath, List<String> args) async {
   print('=== [GOV] BINARY DNA SEALING [DPI-GATE-GOLD] ===');
   
+  // 0. Capturar Hash de Git (Vinculación Source-Binary)
+  String gitHash = 'UNKNOWN';
+  try {
+    final result = await Process.run('git', ['rev-parse', 'HEAD'], workingDirectory: basePath);
+    if (result.exitCode == 0) {
+      gitHash = (result.stdout as String).trim();
+      print('  [DNA] Git Commit: $gitHash');
+      final gitFile = File(p.join(basePath, 'vault', 'intel', 'git_commit.txt'));
+      await gitFile.writeAsString(gitHash);
+    }
+  } catch (_) {
+    print('  [DNA] [WARN] No se pudo obtener el hash de Git.');
+  }
+
   final exePath = Platform.resolvedExecutable;
   final exeFile = File(exePath);
   
@@ -1835,7 +1907,7 @@ Future<void> runSealDNA(String basePath, List<String> args) async {
   // 1. Calcular Hash del Binario Actual
   final bytes = exeFile.readAsBytesSync();
   final binaryHash = sha256.convert(bytes).toString().toLowerCase();
-  print('  [DNA] Hash Detectado: $binaryHash');
+  print('  [DNA] Hash Binario: $binaryHash');
 
   // 2. Preparar Desafío
   final vanguard = VanguardCore();
@@ -1851,7 +1923,7 @@ Future<void> runSealDNA(String basePath, List<String> args) async {
     project: 'Vanguard Kernel',
     files: [p.basename(exePath)],
     basePath: basePath,
-    description: 'Binary DNA Seal for v8.0 Dual Motor',
+    description: 'Binary DNA Seal $kKernelVersion [Git:$gitHash]',
     forcedId: 'DNA-${binaryHash.substring(0, 8)}',
   );
 
@@ -1874,14 +1946,14 @@ Future<void> runSealDNA(String basePath, List<String> args) async {
   await sigFile.writeAsString(binaryHash);
   
   print('\n\x1B[32m[SUCCESS] ADN BINARIO SELLADO E INMUTABLE.\x1B[0m');
-  print('[INFO] El búnker ahora solo aceptará este binario específico.');
+  print('[INFO] El búnker ahora solo aceptará este binario específico vinculado al commit $gitHash.');
   
   // Registro Forense
   await ForensicLedger().appendEntry(
     sessionId: 'S24-GOLD',
     type: 'BASE',
     task: 'DNA-SEAL',
-    detail: 'Sello de ADN Binario v8.0 Certificado: $binaryHash',
+    detail: 'Sello de ADN Binario $kKernelVersion Certificado: $binaryHash | Git: $gitHash',
     basePath: basePath,
     role: 'PO'
   );

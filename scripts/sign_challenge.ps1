@@ -13,7 +13,7 @@ try {
     $XML = Get-Content $KeyPath -Raw
     $RSA.FromXmlString($XML)
     
-    $StagedFiles = @(git diff --cached --name-only) -join ","
+    # $StagedFiles = @(git diff --cached --name-only) -join "," # Removido por desuso (Lint)
     $ContextString = $Challenge
     $Data = [System.Text.Encoding]::UTF8.GetBytes($ContextString)
     $Signature = $RSA.SignData($Data, "SHA256")
@@ -25,7 +25,8 @@ try {
         timestamp = (Get-Date).ToString("o")
     } | ConvertTo-Json -Compress
     
-    [System.IO.File]::WriteAllText($SigPath, $Payload)
+    $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($SigPath, $Payload, $Utf8NoBom)
     Write-Host "FIRMADO OK"
 } catch {
     Write-Error "ERROR AL FIRMAR: $_"
