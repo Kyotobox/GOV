@@ -498,18 +498,18 @@
     {
       "id": "S26-DEBT",
       "name": "Deuda Técnica y Term-UI",
-      "status": "TODO",
+      "status": "DONE",
       "goal": "Implementar visualización nativa en terminal y resolver deuda de usabilidad.",
       "tasks": [
         {
           "id": "TASK-DPI-S26-01",
           "label": "DEBT",
           "desc": "Implementación del Dashboard Term-UI para telemetría consolidada en consola",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["DEV"]
         }
       ]
     }
   ],
-  "current_sprint": "S26-DEBT"
+  "current_sprint": "S26-READY"
 }

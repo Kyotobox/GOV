@@ -125,12 +125,25 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // [S25-07] Resolver ruta del Oráculo desde el ejecutable
+  // [S25-07] Resolver ruta del Oráculo buscando la carpeta 'vault' hacia arriba
   String _resolveOracleRoot() {
     final exePath = Platform.resolvedExecutable;
+    Directory current = Directory(p.dirname(exePath));
+    
+    // Buscar hacia arriba hasta encontrar 'vault' o llegar a la raíz
+    while (true) {
+      if (Directory(p.join(current.path, 'vault')).existsSync()) {
+        return current.path;
+      }
+      if (current.path == current.parent.path) break;
+      current = current.parent;
+    }
+
+    // Fallback: Si no se encuentra, usar el directorio del ejecutable o bin/parent
     final exeDir = Directory(p.dirname(exePath));
-    // Si Vanguard.exe es dev/build o está en bin/
-    if (p.basename(exeDir.path) == 'bin' || p.basename(exeDir.path) == 'debug' || p.basename(exeDir.path) == 'release') {
+    if (p.basename(exeDir.path).toLowerCase() == 'bin' || 
+        p.basename(exeDir.path).toLowerCase() == 'release' || 
+        p.basename(exeDir.path).toLowerCase() == 'debug') {
       return exeDir.parent.path;
     }
     return exeDir.path;
@@ -143,7 +156,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     try {
       final fleetFile = File(masterFleetPath);
       if (await fleetFile.exists()) {
-        final data = jsonDecode(await fleetFile.readAsString());
+        final bytes = await fleetFile.readAsBytes();
+        final data = jsonDecode(utf8.decode(bytes));
         final List<dynamic> bunkers = data['bunkers'] ?? data['projects'] ?? [];
         _projects = bunkers.map((e) {
           final bunker = Project.fromJson(e);
@@ -204,7 +218,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     final sessionLock = File(p.join(project.rootPath, '.meta', 'session.lock'));
     if (await sessionLock.exists()) {
       try {
-        final data = jsonDecode(await sessionLock.readAsString());
+        final bytes = await sessionLock.readAsBytes();
+        final data = jsonDecode(utf8.decode(bytes));
         if (data['timestamp'] != null) {
           setState(() {
             _takeoverTime = DateTime.parse(data['timestamp']);
@@ -240,7 +255,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     final cFile = File(p.join(project.rootPath, 'vault', 'intel', 'challenge.json'));
     if (await cFile.exists()) {
       try {
-        final data = jsonDecode(await cFile.readAsString());
+        final bytes = await cFile.readAsBytes();
+        final data = jsonDecode(utf8.decode(bytes));
         final String newId = data['challenge'];
         
         // [FIX-UX] Evitar re-mostrar desafíos ya procesados localmente
@@ -263,7 +279,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     // 1b. Timeout Check
     _countdownTimer?.cancel();
     if (_challenge != null) {
-      final tsStr = (jsonDecode(await cFile.readAsString()))['timestamp'];
+      final bytes = await cFile.readAsBytes();
+      final tsStr = (jsonDecode(utf8.decode(bytes)))['timestamp'];
       if (tsStr != null) {
         final ts = DateTime.parse(tsStr);
         final diff = DateTime.now().difference(ts).inSeconds;
@@ -287,7 +304,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     final pFile = File(p.join(project.rootPath, 'vault', 'intel', 'intel_pulse.json'));
     if (await pFile.exists()) {
       try {
-        final data = jsonDecode(await pFile.readAsString());
+        final bytes = await pFile.readAsBytes();
+        final data = jsonDecode(utf8.decode(bytes));
         if (mounted) {
           setState(() {
             _cus = (data['cp_fatigue'] ?? data['cp'] ?? 0.0) / 100.0;
@@ -329,7 +347,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     final bFile = File(p.join(project.rootPath, 'backlog.json'));
     if (await bFile.exists()) {
       try {
-        final data = jsonDecode(await bFile.readAsString());
+        final bytes = await bFile.readAsBytes();
+        final data = jsonDecode(utf8.decode(bytes));
         if (mounted) {
           setState(() {
             _backlog = data;
@@ -363,7 +382,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     final hFile = File(p.join(project.rootPath, 'vault', 'intel', 'signature_history.json'));
     if (await hFile.exists()) {
       try {
-        final List<dynamic> history = jsonDecode(await hFile.readAsString());
+        final bytes = await hFile.readAsBytes();
+        final List<dynamic> history = jsonDecode(utf8.decode(bytes));
         if (mounted) setState(() => _recentHistory = history.take(5).toList());
       } catch (_) {}
     }

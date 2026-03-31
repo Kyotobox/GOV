@@ -44,13 +44,13 @@ class ForensicLedger {
         // Inicializar el Ledger si no existe
         final header = '| Timestamp | Role | SessionID | PrevHash | Type | Task | Detail |\n'
                        '| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n';
-        await historyFile.writeAsString(header);
+        await historyFile.writeAsString(header, encoding: utf8);
       }
 
       final timestamp = _formatTimestamp(DateTime.now());
       final entry = '| $timestamp | $effectiveRole | $sessionId | $prevHash | $type | $task | $detail |';
       
-      await historyFile.writeAsString('$entry\n', mode: FileMode.append, flush: true);
+      await historyFile.writeAsString('$entry\n', mode: FileMode.append, flush: true, encoding: utf8);
       
       final currentHash = _calculateLineHash(entry);
       
@@ -76,7 +76,7 @@ class ForensicLedger {
       });
       // Mantener solo los últimos 50 eventos para rendimiento de la UI
       if (historyData.length > 50) historyData = historyData.sublist(0, 50);
-      await jsonFile.writeAsString(jsonEncode(historyData));
+      await jsonFile.writeAsString(jsonEncode(historyData), encoding: utf8);
 
       // S24-SILVER: Auto-commit para mantener Git-Zero activo.
       try {

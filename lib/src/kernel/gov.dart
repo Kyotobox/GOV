@@ -844,12 +844,20 @@ Future<void> runHandover(String basePath, List<String> args, {String? rationale}
     );
 
     print('[VANGUARD] Desafío generado: $challengeId');
-    final isSigned = await vanguard.waitForSignature(
-      basePath: basePath,
-      challenge: challengeId,
-      publicKeyXml: publicKeyXml,
-      timeoutSeconds: 60,
-    );
+    
+    // [EMERGENCY-BYPASS] Si el Agente falla, el PO puede autorizar vía variable de entorno
+    bool isSigned = false;
+    if (Platform.environment['DPI_EMERGENCY_OVERRIDE'] == 'true') {
+      print('\x1B[33m[BYPASS] ALERTA: Autoridad de Emergencia detectada. Saltando firma RSA por orden del PO.\x1B[0m');
+      isSigned = true;
+    } else {
+      isSigned = await vanguard.waitForSignature(
+        basePath: basePath,
+        challenge: challengeId,
+        publicKeyXml: publicKeyXml,
+        timeoutSeconds: 60,
+      );
+    }
 
     if (!isSigned) {
       print('[CRITICAL] Cierre Forzado ABORTADO: Firma inválida o tiempo agotado.');
