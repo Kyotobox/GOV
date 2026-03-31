@@ -28,3 +28,4 @@
 | 2026-03-31 16:01 | ARCH | S24-GOLD | 825ad897bd0dd2124f2661b7e805d4ee79ee4a7d10f8c9a215abb2016e490567 | EXEC | DPI-ADOPT | Proyecto adoptado: legacy_project en c:\users\ruben\appdata\local\temp\dpi_test_b34e0082\legacy_project. Brechas: 4 |
 | 2026-03-31 16:27 | PO | S24-GOLD | 076c3956cdf6500f1520478975f4f1f10ed41be8a9a9ab9f531cb8860a23b233 | BASE | Sello de Calidad | Fuera de Sprint | Handover Seal: Cierre de jornada con cambios. |
 | 2026-03-31 16:28 | PO | S24-GOLD | d58729273ee809225237e9991d14b1050e28e2e4929ad9502b977f8305a7d452 | BASE | Baseline Seal | v8.2.0: Core sync, BHI 70/30 & Base2 Replication |
+| 2026-03-31 16:31 | PO | S24-GOLD | 5793f6e6e11aa22fe14f5727de34f87fe7a3c9e48a5fa937a349b7e952a7ba3a | BASE | Baseline Seal | v8.2.0: UI version parity & Final replication |
