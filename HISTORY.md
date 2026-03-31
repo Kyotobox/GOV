@@ -19,3 +19,4 @@
 | 2026-03-30 06:15 | ARCH | S24-GOLD | f87ad167d428edbbeb204323952dfe1318bee129ef7cd933f7f1643c588caf57 | EXEC | DPI-ADOPT | Proyecto adoptado: test_adopt_proj en test_adopt_proj. Brechas: 4 |
 | 2026-03-30 06:37 | ARCH | S24-GOLD | eed333e0f8d57c7a6e75bcf3214124b379cb132561e3ed21b93c6dc2f9933350 | INIT | DPI-INIT | Proyecto creado: CLI_Project |
 | 2026-03-31 08:47 | ARCH | S24-GOLD | 269ec4e49d152a6c087e995e8d497602a9355baff3f6e94ab106990975916f0a | EXEC | DPI-ADOPT | Proyecto adoptado: tmp_project en ./tmp_project. Brechas: 4 |
+| 2026-03-31 09:20 | ARCH | S24-GOLD | d19d7e0e6342859908f8e12feef302cefe3d6eac65c427cd6bc975e8dd5bb9a3 | EXEC | DPI-ADOPT | Proyecto adoptado: Base2 en C:\Users\Ruben\Documents\Base2. Brechas: 1 |

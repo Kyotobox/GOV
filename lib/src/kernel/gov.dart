@@ -1,18 +1,13 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:async';
 import 'dart:math';
 import 'package:path/path.dart' as p;
-import 'package:xml/xml.dart';
-import 'package:pointycastle/export.dart';
 import 'package:crypto/crypto.dart';
-import 'package:watcher/watcher.dart';
 import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
 import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
-import 'package:antigravity_dpi/src/security/sign_engine.dart';
 
 /// Base2 Governance Motor [DPI-GATE-GOLD]
 /// Hardened with Vanguard RSA-2048 Lock.
@@ -30,7 +25,7 @@ void main(List<String> args) async {
   final command = args[0];
 
   // Session Lock Guard (Criogénico)
-  if (lockFile.existsSync() && command != 'takeover' && command != 'status' && command != 'sync-context') {
+  if (lockFile.existsSync() && command != 'takeover' && command != 'status' && command != 'dashboard' && command != 'sync-context') {
     print('[ERROR] Sesión Sellada. Relevo requerido via "gov takeover" en nuevo chat.');
     exit(1);
   }
@@ -61,7 +56,7 @@ void main(List<String> args) async {
       await runSealDNA(basePath, args);
       break;
     case 'dashboard':
-      await _runDashboard(basePath);
+      await _runDashboard(basePath, watch: args.contains('--watch') || args.contains('-w'));
       break;
     case 'sync-tasks':
       await _runSyncTasks(basePath, args);
@@ -412,16 +407,36 @@ Future<void> runHealthCheck(String basePath, List<String> args) async {
   }
 }
 
-Future<void> _runDashboard(String basePath) async {
-  print('=== [GOV] DASHBOARD REGENERATOR v8.0 ===');
+Future<void> _runDashboard(String basePath, {bool watch = false}) async {
+  final now = DateTime.now().toLocal();
+  final cognitive = CognitiveEngine();
   final integrity = IntegrityEngine();
+
+  if (watch) {
+    print('\x1B[2J\x1B[H'); // Clear screen
+    print('Entrando en modo interactivo [DPI-WATCH]...');
+    
+    // Bucle de actualización
+    while (true) {
+      final pulse = await cognitive.calculatePulse(basePath);
+      final swelling = await integrity.checkSwelling(basePath);
+      final backlogStr = await _getRichContext(basePath);
+      
+      _printTermHUD(pulse, swelling, backlogStr);
+      
+      print('\n  Presione Ctrl+C para salir | Actualizado: ${DateTime.now().toLocal().toString().split(' ').last.split('.').first}');
+      
+      await Future.delayed(const Duration(seconds: 2));
+      stdout.write('\x1B[H'); // Volver al inicio sin borrar (reduce parpadeo)
+    }
+  }
+
+  // Comportamiento por defecto: Generar DASHBOARD.md
+  print('=== [GOV] DASHBOARD REGENERATOR v8.0 ===');
   final swelling = await integrity.checkSwelling(basePath);
-  
   final sizeMB = swelling.totalBytes / (1024 * 1024);
   final chatUuid = Platform.environment['VANGUARD_CHAT_UUID'] ?? 'UNKNOWN';
-  final now = DateTime.now().toLocal();
-  
-  final pulse = await CognitiveEngine().calculatePulse(basePath);
+  final pulse = await cognitive.calculatePulse(basePath);
   final cus = pulse.context.cus;
   final bhi = pulse.bunker.bhi;
   
@@ -453,6 +468,46 @@ Future<void> _runDashboard(String basePath) async {
   await File(p.join(destDir.path, dashboardFilename)).writeAsString(content);
   print('[SUCCESS] ${p.join(dashboardPath, dashboardFilename)} actualizado con métricas v8.0.');
 }
+
+void _printTermHUD(DualPulseData pulse, dynamic swelling, String contextLine) {
+  final cus = pulse.context.cus;
+  final bhi = pulse.bunker.bhi;
+  final chatUuid = Platform.environment['VANGUARD_CHAT_UUID'] ?? 'MANUAL-SESSION';
+  final sizeMB = swelling.totalBytes / (1024 * 1024);
+
+  String _bar(double val, Colors c) {
+    const int width = 15;
+    final int filled = (val / 100 * width).clamp(0, width).toInt();
+    final String colorCode = c == Colors.red ? '\x1B[31m' : (c == Colors.orange ? '\x1B[33m' : (c == Colors.cyan ? '\x1B[36m' : '\x1B[32m'));
+    return '$colorCode${'█' * filled}${'\x1B[0m\x1B[2m'}${ '░' * (width - filled)}\x1B[0m';
+  }
+
+  String _status(double val, {bool isBhi = false}) {
+    if (val < 70) return isBhi ? '\x1B[32mSAFE\x1B[0m' : '\x1B[36mNOMINAL\x1B[0m';
+    if (val < 85) return '\x1B[33mFATIGA\x1B[0m';
+    return '\x1B[31mREDLINE\x1B[0m';
+  }
+
+  print('\x1B[1m┌──────────────────────────────────────────────────────────┐\x1B[0m');
+  print('\x1B[1m│ \x1B[35mVANGUARD HUD\x1B[0m [DPI-GATE-GOLD] v8.1.0-DEBT                 │');
+  print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
+  print('│ \x1B[2mSESSION:\x1B[0m ${chatUuid.take(12)}... | \x1B[2mSTRAT:\x1B[0m KERNEL-8.1     │');
+  print('│ \x1B[2mCONTEXT:\x1B[0m ${contextLine.take(48).padRight(48)} │');
+  print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
+  print('│ [BHI] BÚNKER   [${_bar(bhi, bhi < 70 ? Colors.green : (bhi < 90 ? Colors.orange : Colors.red))}] ${bhi.toStringAsFixed(1)}% (${_status(bhi, isBhi: true)})     │');
+  print('│ [CUS] CONTEXTO [${_bar(cus, cus < 70 ? Colors.cyan : (cus < 85 ? Colors.orange : Colors.red))}] ${cus.toStringAsFixed(1)}% (${_status(cus)})   │');
+  print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
+  print('│ FILES: ${swelling.fileCount.toString().padRight(2)} | SIZE: ${sizeMB.toStringAsFixed(2).padRight(4)} MB | ZOMBIES: ${pulse.bunker.zombies.toString().padRight(2)}            │');
+  print('│ DRIFT: ${pulse.saturation < 85 ? '\x1B[32m✅ OPTIMAL\x1B[0m' : '\x1B[31m🛑 UNSTABLE\x1B[0m'} | CPU_TAX: ${(pulse.saturation / 40).toStringAsFixed(1)}%                        │');
+  print('\x1B[1m└──────────────────────────────────────────────────────────┘\x1B[0m');
+}
+
+extension StringExt on String {
+  String take(int n) => length <= n ? this : substring(0, n);
+}
+
+// Dummy Colors for CLI logic
+enum Colors { green, cyan, orange, red }
 
 Future<String> _getRichContext(String basePath) async {
   final bFile = File(p.join(basePath, 'backlog.json'));

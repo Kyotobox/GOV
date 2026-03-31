@@ -434,67 +434,82 @@
     {
       "id": "S25-SATURATION",
       "name": "Enforcement de Saturación y Precisión del Motor",
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "goal": "Convertir el sistema de saturación de informativo a coercitivo: Hard Gate en gov act, CUS operativo, Dual Dial en Vanguard, wizards robustos, fleet pulse automático.",
       "tasks": [
         {
           "id": "TASK-DPI-S25-01",
           "label": "GOV",
           "desc": "Hard Gate en gov act — bloquear ejecución cuando saturation >= 80% con exit code 1",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["ARCH"]
         },
         {
           "id": "TASK-DPI-S25-02",
           "label": "GOV",
           "desc": "Conectar incrementTurns al flujo de gov act y gov baseline para hacer CUS operativo",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["ARCH"]
         },
         {
           "id": "TASK-DPI-S25-03",
           "label": "UI",
           "desc": "Dual Dial minimalista en Vanguard — BHI y CUS como indicadores separados en TerminalTab",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["DEV"]
         },
         {
           "id": "TASK-DPI-S25-04",
           "label": "UI",
           "desc": "Mejoras UX al botón Emergency Handover — confirmación modal y estado visual post-handover",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["DEV"]
         },
         {
           "id": "TASK-DPI-S25-05",
           "label": "GOV",
           "desc": "Corregir wizards DPI-INIT y DPI-ADOPT — rutas correctas, flag --commit en adopt, registro en fleet",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["ARCH", "DEV"]
         },
         {
           "id": "TASK-DPI-S25-06",
           "label": "TEL",
           "desc": "Fleet Pulse auto-update — gov pulse debe actualizar fleet_pulse.json en cada heartbeat",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["ARCH"]
         },
         {
           "id": "TASK-DPI-S25-07",
           "label": "OPS",
           "desc": "Eliminar hardcoded paths en main.dart y leer versión dinámicamente desde backlog.json",
-          "status": "TODO",
+          "status": "DONE",
           "required_signatures": ["DEV"]
         },
         {
           "id": "TASK-DPI-S25-08",
           "label": "UI",
           "desc": "Mostrar fecha del último git push en el panel de telemetría de Vanguard",
+          "status": "DONE",
+          "required_signatures": ["DEV"]
+        }
+      ]
+    },
+    {
+      "id": "S26-DEBT",
+      "name": "Deuda Técnica y Term-UI",
+      "status": "TODO",
+      "goal": "Implementar visualización nativa en terminal y resolver deuda de usabilidad.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S26-01",
+          "label": "DEBT",
+          "desc": "Implementación del Dashboard Term-UI para telemetría consolidada en consola",
           "status": "TODO",
           "required_signatures": ["DEV"]
         }
       ]
     }
   ],
-  "current_sprint": "S25-SATURATION"
+  "current_sprint": "S26-DEBT"
 }
