@@ -1,9 +1,9 @@
-# SCRIPT DE CONSTRUCCIÓN Y DESPLIEGUE (v8.2.0) [DPI-GATE-GOLD]
+# SCRIPT DE CONSTRUCCIÓN Y DESPLIEGUE (v8.2.1) [DPI-GATE-GOLD]
 $ProjectRoot = "c:\Users\Ruben\Documents\antigravity_dpi"
 $BunkerPath = "$ProjectRoot\vanguard_agent"
 $DestPath = "c:\Users\Ruben\Documents\Base2\bin"
 
-Write-Host "=== [GOV] INICIANDO COMPILACIÓN DUAL v8.2.0 ===" -ForegroundColor Cyan
+Write-Host "=== [GOV] INICIANDO COMPILACIÓN DUAL v8.2.1 ===" -ForegroundColor Cyan
 
 # 1. Compilación del Kernel (antigravity_dpi)
 Write-Host "Compilando Kernel (gov.dart)..." -ForegroundColor Yellow
@@ -41,10 +41,10 @@ if (Test-Path $BinaryPath) {
         Copy-Item $_.FullName -Destination $DestPath -Force
     }
     
-    Write-Host "[SUCCESS] Vanguard v8.2.0 + Kernel Inyectados en $DestPath" -ForegroundColor Green
+    Write-Host "[SUCCESS] Vanguard v8.2.1 + Kernel Inyectados en $DestPath" -ForegroundColor Green
 } else {
     Write-Host "[FAIL] Error crítico en la compilación del Agente." -ForegroundColor Red
 }
 
 Pop-Location
-Write-Host "=== [GOV] FIN DEL PROCEDIMIENTO v8.2.0 ===" -ForegroundColor Cyan
+Write-Host "=== [GOV] FIN DEL PROCEDIMIENTO v8.2.1 ===" -ForegroundColor Cyan

@@ -1,5 +1,6 @@
 {
   "project": "Antigravity DPI",
+  "version": "8.2.1",
   "sprints": [
     {
       "id": "S05-DPI",

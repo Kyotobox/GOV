@@ -28,7 +28,7 @@ class VanguardElite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanguard Elite 8.2.0',
+      title: 'Vanguard Elite 8.2.1',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,

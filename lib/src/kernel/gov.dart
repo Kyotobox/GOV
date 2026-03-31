@@ -494,7 +494,7 @@ void _printTermHUD(DualPulseData pulse, dynamic swelling, String contextLine) {
   print('\x1B[1m┌──────────────────────────────────────────────────────────┐\x1B[0m');
   print('\x1B[1m│ \x1B[35mVANGUARD HUD\x1B[0m [DPI-GATE-GOLD] $kKernelVersion                      │');
   print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
-  print('│ \x1B[2mSESSION:\x1B[0m ${chatUuid.take(12)}... | \x1B[2mSTRAT:\x1B[0m KERNEL-8.1     │');
+  print('│ \x1B[2mSESSION:\x1B[0m ${chatUuid.take(12)}... | \x1B[2mSTRAT:\x1B[0m $kKernelVersion     │');
   print('│ \x1B[2mCONTEXT:\x1B[0m ${contextLine.take(48).padRight(48)} │');
   print('\x1B[1m├──────────────────────────────────────────────────────────┤\x1B[0m');
   print('│ [BHI] BÚNKER   [${_bar(bhi, bhi < 70 ? Colors.green : (bhi < 90 ? Colors.orange : Colors.red))}] ${bhi.toStringAsFixed(1)}% (${_status(bhi, isBhi: true)})     │');
@@ -837,6 +837,11 @@ Future<void> runTakeover(String basePath, List<String> args) async {
     'last_action': now,
   }));
   
+  // Sincronizar UUID con el pulso central para el Agente Vanguard
+  final cognitive = CognitiveEngine();
+  final pulse = await cognitive.calculatePulse(basePath);
+  await cognitive.persistPulse(basePath, pulse);
+
   await _runAudit(basePath);
   print('[OK] Sesión iniciada y sincronizada.');
 }
@@ -1109,7 +1114,8 @@ class ContextEngine {
     int estimatedTokens = (toolCpValue * 300).toInt();
 
     // 3. Fórmula Unificada (Base2 Compatible)
-    final double finalCus = (toolCpValue + (trueChatTurns * 0.5)).clamp(0.0, 100.0);
+    // SSoT: (atomicTurns * 1.2) + (atomicChats * 0.5)
+    final double finalCus = ((trueAiTurns * 1.2) + (trueChatTurns * 0.5)).clamp(0.0, 100.0);
 
     return ContextState(
       cus: finalCus,
@@ -1132,18 +1138,16 @@ class BunkerHealthEngine {
     final zombies = await integrity.checkZombies(basePath);
 
     // 1. Integridad Criptográfica (70% del peso)
+    // Ponderación Vanguard v8.2.0 [70/30]
     final bool isSelfIntact = await integrity.verifySelf(toolRoot: basePath);
     final double integrityScore = isSelfIntact ? 0.0 : 70.0;
 
-    // 2. Densidad (15% del peso)
-    // kMaxRootFiles = 20 (estándar v8)
-    final double densityScore = (swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 15.0;
+    // 2. Densidad y Zombies (30% del peso restante)
+    // Higiene (0-30 pts): (density/20 * 15) + (zombies * 3)
+    final double hygieneScore = ((swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 15.0) + 
+                               (zombies.length * 3.0).clamp(0.0, 15.0);
 
-    // 3. Higiene / Zombies (15% del peso)
-    // 1 zombie = 3% de penalización (hasta un máximo de 5 zombies para cubrir el 15%)
-    final double zombieScore = (zombies.length * 3.0).clamp(0.0, 15.0);
-
-    final double finalBhi = (integrityScore + densityScore + zombieScore).clamp(0.0, 100.0);
+    final double finalBhi = (integrityScore + hygieneScore).clamp(0.0, 100.0);
 
     return BunkerHealthState(
       bhi: finalBhi,
@@ -1152,8 +1156,7 @@ class BunkerHealthEngine {
       detail: {
         'dna_intact': isSelfIntact,
         'integrity_penalty': integrityScore,
-        'density_penalty': densityScore.toStringAsFixed(1),
-        'zombie_penalty': zombieScore,
+        'hygiene_penalty': hygieneScore.toStringAsFixed(1),
         'root_files': swelling.fileCount,
         'zombie_list': zombies.take(5).toList(),
       },
