@@ -59,6 +59,25 @@ class ForensicLedger {
       
       print('DEBUG: ForensicLedger [${historyFile.absolute.path}] APPEND_OK (Anchored: ${currentHash.substring(0, 8)})');
 
+      // VUL-13: Sincronización JSON para Vanguard Agent UI
+      final jsonFile = File(p.join(basePath, 'vault', 'intel', 'signature_history.json'));
+      List<dynamic> historyData = [];
+      if (await jsonFile.exists()) {
+        try {
+          historyData = jsonDecode(await jsonFile.readAsString());
+        } catch (_) {}
+      }
+      historyData.insert(0, {
+        "timestamp": DateTime.now().toIso8601String(),
+        "type": type,
+        "task": task,
+        "detail": detail,
+        "role": effectiveRole
+      });
+      // Mantener solo los últimos 50 eventos para rendimiento de la UI
+      if (historyData.length > 50) historyData = historyData.sublist(0, 50);
+      await jsonFile.writeAsString(jsonEncode(historyData));
+
       // S24-SILVER: Auto-commit para mantener Git-Zero activo.
       try {
         await Process.run('git', ['add', 'HISTORY.md'], workingDirectory: basePath);

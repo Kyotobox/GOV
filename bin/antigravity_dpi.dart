@@ -2,47 +2,110 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
-import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 import 'package:antigravity_dpi/src/security/vanguard_core.dart';
+import 'package:antigravity_dpi/src/security/integrity_engine.dart';
 import 'package:antigravity_dpi/src/telemetry/forensic_ledger.dart';
+import 'package:antigravity_dpi/src/kernel/gov.dart';
 
 /// Base2 Governance Motor [DPI-GATE-GOLD] - Hardened Oráculo
 /// Implementation for Antigravity DPI.
 void main(List<String> args) async {
-  if (args.isEmpty) {
-    print('Base2 Governance Motor [DPI-GATE-GOLD] - Oráculo');
-    print('Usage: gov <command> [options]');
-    print('Commands: audit, status, baseline, takeover, handover');
-    exit(0);
+  if (args.isEmpty || args[0] == 'help') {
+    _printHelp();
+    return;
   }
 
   final command = args[0];
   final basePath = Directory.current.path;
 
+  // S104-DNA: Self-Audit Ineludible (Determinar Raíz Real de la Herramienta)
+  final integrityCheck = IntegrityEngine();
+  final isDev = Platform.environment['DPI_GOV_DEV'] == 'true';
+  
+  // En binarios, toolRoot es la carpeta donde vive el .exe
+  final toolRoot = Platform.script.isScheme('file') 
+      ? p.dirname(Platform.script.toFilePath()) 
+      : p.dirname(Platform.resolvedExecutable);
+
+  if (!isDev && !await integrityCheck.verifySelf(toolRoot: toolRoot)) {
+    print('\x1B[31m[STOP] Oraculo corrupto o sin sello de ADN. Operacion abortada.\x1B[0m');
+    exit(1);
+  }
+
   switch (command) {
     case 'audit':
-      if (args.contains('--simulate-tamper')) {
-        await _runAuditSimulateTamper(basePath);
-      } else {
-        await _runAudit(basePath);
-      }
+      await _runAudit(basePath);
       break;
     case 'status':
       await _printStatus(basePath);
+      break;
+    case 'dashboard':
+      await _runDashboard(basePath);
       break;
     case 'baseline':
       await _runBaseline(basePath, args.length > 1 ? args[1] : 'Manual Update');
       break;
     case 'takeover':
-      await _runTakeover(basePath);
+      await runTakeover(basePath);
       break;
     case 'handover':
-      await _runHandover(basePath);
+      await runHandover(basePath, args);
+      break;
+    case 'sync-tasks':
+      await _runSyncTasks(basePath);
+      break;
+    case 'pulse':
+      await runPulse(basePath, args);
+      break;
+    case 'init':
+      await runInit(basePath, args);
+      break;
+    case 'adopt':
+      await runAdopt(basePath, args);
+      break;
+    case 'plan':
+      await runPlan(basePath, args);
+      break;
+    case 'prompt':
+      await runPrompt(basePath);
+      break;
+    case 'seal-dna':
+      await runSealDNA(basePath, args);
+      break;
+    case 'act':
+      await runAct(basePath, args);
+      break;
+    case 'health':
+      await runHealthCheck(basePath, args);
+      break;
+    case 'help':
+      _printHelp();
       break;
     default:
       print('Unknown command: $command');
       exit(1);
   }
+}
+
+void _printHelp() {
+  print('=== [GOV] VANGUARD KERNEL [DPI-GATE-GOLD] ===');
+  print('Comandos Disponibles:');
+  print('  help         : Muestra esta ayuda.');
+  print('  status       : Estado global, SHS y tareas activas.');
+  print('  pulse        : Calibra la estamina cognitiva. Use --declare <val> para forzar saturación.');
+  print('  act          : Ejecuta/Sella la actividad actual.');
+  print('  prompt       : Genera contexto condensado para el Agente.');
+  print('  audit        : Ejecuta suite completa de integridad.');
+  print('  baseline     : Certifica un hito con firma criptográfica.');
+  print('  takeover     : Inicia sesión / Reclama control del búnker.');
+  print('  handover     : Cierre seguro de sesión con relevo.');
+  print('  init         : Inicializa un nuevo proyecto (Bootstrapping).');
+  print('  adopt        : Adopta un proyecto existente (Rescue).');
+  print('  plan         : Planificación de sprints y tareas.');
+  print('  health       : Certificación de coherencia del sistema.');
+  print('  sync-tasks   : Sincroniza estado del backlog con task.md.');
+  print('  seal-dna     : Sella el ADN binario del motor (gov.exe) con firma RSA.');
+  print('  dashboard    : Lanza telemetría visual (Terminal).');
 }
 
 // --- [COMMANDS] ---
@@ -51,6 +114,11 @@ Future<void> _runAudit(String basePath) async {
   print('=== [GOV] ATOMIC AUDIT [DPI-GATE-GOLD] ===');
   
   final integrity = IntegrityEngine();
+  final cognitive = CognitiveEngine();
+  
+  final pulseData = await cognitive.calculatePulse(basePath);
+  await cognitive.persistPulse(basePath, pulseData);
+  
   final swelling = await integrity.checkSwelling(basePath);
   final zombies = await integrity.checkZombies(basePath);
   
@@ -60,18 +128,18 @@ Future<void> _runAudit(String basePath) async {
   } else {
     print('[OK] Ledger Chain: Verificada');
   }
-  // S21-02: Hardcode SHS Rules
-  double saturation = (swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 100;
-  if (zombies.isNotEmpty) saturation += (zombies.length * IntegrityEngine.kZombiePenalty);
   
   print('----------------------------------------');
-  print('Root Density: ${swelling.fileCount} files (Limit: ${IntegrityEngine.kMaxRootFiles})');
-  print('Zombies:      ${zombies.length}');
-  print('SHS Pulse:    ${saturation.toStringAsFixed(1)}% [${saturation < IntegrityEngine.kPanicThreshold ? 'NOMINAL' : 'CRITICAL'}]');
+  print('Root Density: ${swelling.fileCount} files');
+  print('Root Weight:  ${(swelling.totalBytes / 1024 / 1024).toStringAsFixed(2)} MB');
+  print('Zombies:      ${pulseData.bunker.zombies}');
+  print('Context (CUS): ${pulseData.context.cus.toStringAsFixed(1)}% [${pulseData.context.cus < 85 ? 'NOMINAL' : 'REDLINE'}]');
+  print('Hygiene (BHI): ${pulseData.bunker.bhi.toStringAsFixed(1)}% [${pulseData.bunker.bhi < 90 ? 'SAFE' : 'DIRTY'}]');
+  print('CP Detail:    ${pulseData.context.cus} (Turns: ${pulseData.context.detail['turns']})');
   print('----------------------------------------');
 
-  if (saturation >= IntegrityEngine.kPanicThreshold) {
-    print('[ALERT] Sistema en estado de fatiga extrema. Purga requerida.');
+  if (pulseData.context.cus >= 85 || pulseData.bunker.bhi >= 90) {
+    print('[ALERT] Sistema en estado de fatiga o suciedad extrema. Purga requerida.');
   }
 }
 
@@ -94,14 +162,20 @@ Future<String?> _checkGitZero(String basePath) async {
     if (result.exitCode != 0) return 'Git no disponible o directorio no es repositorio.';
     final output = (result.stdout as String).trim();
     if (output.isNotEmpty) {
-      // S24-SILVER: Filtrar metadatos del motor para permitir fluidez.
-      final lines = output.split('\n').where((l) {
-        final name = l.trim().split(' ').last;
-        return name != 'HISTORY.md' && name != 'PROJECT_LOG.md';
-      });
+      final allLines = output.split('\n');
+      final filteredLines = allLines.where((l) {
+        final lowerLine = l.toLowerCase();
+        // S24-GOLD: Exclusión absoluta de metadatos de gobernanza e inmunidad del propio motor.
+        if (lowerLine.contains('.meta') || lowerLine.contains('vault/intel')) return false;
+        if (lowerLine.contains('session.lock') || lowerLine.contains('dashboard.md')) return false;
+        if (lowerLine.contains('history.md') || lowerLine.contains('project_log.md')) return false;
+        if (lowerLine.contains('bin/gov.exe')) return false;
+        
+        return true;
+      }).toList();
 
-      if (lines.isNotEmpty) {
-        return 'Entorno Git sucio:\n${lines.join('\n')}';
+      if (filteredLines.isNotEmpty) {
+        return 'Entorno Git sucio (fábrica):\n${filteredLines.join('\n')}';
       }
     }
     return null;
@@ -143,15 +217,14 @@ Future<void> _runBaseline(String basePath, String message) async {
   }
   print('[OK] Git-Zero: Entorno limpio.');
 
-  // S21-02: SHS Auto-Lock
-  final integrity = IntegrityEngine();
-  final swelling = await integrity.checkSwelling(basePath);
-  final zombies = await integrity.checkZombies(basePath);
-  double saturation = (swelling.fileCount / IntegrityEngine.kMaxRootFiles) * 100;
-  if (zombies.isNotEmpty) saturation += (zombies.length * IntegrityEngine.kZombiePenalty);
+  // S21-02: SHS Auto-Lock (Unified via CognitiveEngine)
+  final cognitive = CognitiveEngine();
+  final pulseData = await cognitive.calculatePulse(basePath);
+  final saturation = pulseData.saturation.toDouble();
   
   if (saturation >= IntegrityEngine.kPanicThreshold) {
     print('[BLOCKED] SHS FATIGUE (${saturation.toStringAsFixed(1)}%). Purga requerida.');
+    print('[DETAIL] CP: ${pulseData.cp} | CL: ${pulseData.detail['context_load']}');
     exit(1);
   }
 
@@ -179,6 +252,9 @@ Future<void> _runBaseline(String basePath, String message) async {
   // --- [S24-04: RECOVERY-SEED PHASE] ---
   String finalChallengeId = blackGateId ?? '';
   
+  final integrity = IntegrityEngine();
+  final swelling = await integrity.checkSwelling(basePath);
+
   if (finalChallengeId.isEmpty) {
     // 1. Issue Challenge (S22 Refactor: Use library signature)
     finalChallengeId = await vanguard.issueChallenge(
@@ -236,77 +312,55 @@ Future<void> _runBaseline(String basePath, String message) async {
 Future<void> _printStatus(String basePath) async {
   print('=== [GOV] SYSTEM STATUS ===');
   final backlogFile = File(p.join(basePath, 'backlog.json'));
+  String project = 'Unknown';
+  
   if (backlogFile.existsSync()) {
     final data = jsonDecode(await backlogFile.readAsString());
-    print('Project: ${data['project']}');
-    print('SHS:     ${data['shs_metrics']['saturation']}%');
-  } else {
-    print('[WARN] backlog.json no encontrado.');
-  }
-}
-
-Future<void> _runTakeover(String basePath) async {
-  print('=== [GOV] SESSION TAKEOVER ===');
-  
-  // S22-02: Validar continuidad mediante Git Hash
-  final lockFile = File(p.join(basePath, 'session.lock'));
-  if (lockFile.existsSync()) {
-    try {
-      final lockData = jsonDecode(await lockFile.readAsString());
-      final lastHash = lockData['gitHash'] as String?;
-      if (lastHash != null) {
-        final currentHash = await _getGitHash(basePath);
-        if (currentHash != null && lastHash != currentHash) {
-          print('[WARN] GitHash divergente desde el último Handover.');
-          print('  Handover: ${lastHash.substring(0, 7)}');
-          print('  Actual:   ${currentHash.substring(0, 7)}');
-        } else {
-          print('[OK] Continuidad Git validada: ${lastHash.substring(0, 7)}');
-        }
-      }
-    } catch (_) {}
+    project = data['project'] ?? 'Unknown';
   }
 
-  await _runAudit(basePath);
-  print('[OK] Sesión iniciada y sincronizada.');
+  final cognitive = CognitiveEngine();
+  final pulse = await cognitive.calculatePulse(basePath);
+  await cognitive.persistPulse(basePath, pulse);
+  
+  print('Project: $project');
+  print('SHS:     ${pulse.saturation}% [Cognitive Engine]');
+  print('CP:      ${pulse.cp}');
+  print('Turns:   ${pulse.detail['turns'] ?? 0}');
+  print('Relief:  ${pulse.detail['relief'] ?? 0}');
 }
 
-Future<void> _runHandover(String basePath) async {
-  print('=== [GOV] SESSION HANDOVER ===');
-  await _runAudit(basePath);
+
+Future<void> _runDashboard(String basePath) async {
+  print('=== [GOV] DASHBOARD REGENERATOR ===');
+  final integrity = IntegrityEngine();
+  final cognitive = CognitiveEngine();
+
+  final pulse = await cognitive.calculatePulse(basePath);
+  final swelling = await integrity.checkSwelling(basePath);
+  final zombies = await integrity.checkZombies(basePath);
   
-  // S22-02: Generar Relay Atómico con Git Hash
-  final gitHash = await _getGitHash(basePath);
-  final timestamp = DateTime.now().toIso8601String();
-  
-  final relayFile = File(p.join(basePath, 'vault', 'intel', 'SESSION_RELAY_TECH.md'));
-  await relayFile.writeAsString('''
-# SESSION RELAY - HANDOVER SEALED
-- **Timestamp**: $timestamp
-- **GitHash**: ${gitHash ?? 'N/A'}
-- **Status**: HANDOVER_SEALED
-''');
+  final dashboard = File(p.join(basePath, 'DASHBOARD.md'));
+  final content = '''
+# DASHBOARD: Centro de Mando [DPI-GATE-GOLD]
 
-  final lockFile = File(p.join(basePath, 'session.lock'));
-  await lockFile.writeAsString(jsonEncode({
-    'status': 'HANDOVER_SEALED',
-    'timestamp': timestamp,
-    'gitHash': gitHash,
-  }));
+| Metrica | Valor | Estado |
+| :--- | :--- | :--- |
+| **SHS Pulse** | ${pulse.saturation}% | ${pulse.saturation < 90 ? 'OK NOMINAL' : 'CRITICAL'} |
+| **Turns** | ${pulse.context.turns} | ${pulse.context.turns < 20 ? 'OK' : 'ALTO'} |
+| **Root Density** | ${swelling.fileCount} f | ${swelling.fileCount < IntegrityEngine.kMaxRootFiles ? 'OK' : 'ALTA'} |
+| **Zombies** | ${pulse.bunker.zombies} | ${pulse.bunker.zombies == 0 ? 'LIMPIO' : 'INFECTADO'} |
+| **Bunker (BHI)** | ${pulse.bunker.bhi.toStringAsFixed(1)}% | ${pulse.bunker.bhi < 90 ? 'HEALTHY' : 'CRITICAL'} |
 
-  // S22-01: Registrar en ForensicLedger
-  final ledger = ForensicLedger();
-  await ledger.appendEntry(
-    sessionId: 'S24-GOLD',
-    type: 'EXEC',
-    task: 'Handover',
-    detail: 'Sesión cerrada por PO. Hash: ${gitHash?.substring(0, 8)}',
-    basePath: basePath,
-    role: 'PO',
-  );
+---
+*Ultima Actualizacion: ${DateTime.now()}*
+''';
 
-  print('[OK] Sesión cerrada y relay generado.');
+  await dashboard.writeAsString(content);
+  print('[SUCCESS] DASHBOARD.md actualizado.');
 }
+
+
 
 // --- [RECOVERY & QA] ---
 
@@ -356,6 +410,115 @@ Future<void> _generateRecoverySeed(String basePath) async {
   stdin.readLineSync();
 }
 
+Future<void> _runSyncTasks(String basePath) async {
+  print('=== [GOV] OMNIDIRECTIONAL SYNC-TASKS [DPI-GATE-GOLD] ===');
+  
+  final backlogFile = File(p.join(basePath, 'backlog.json'));
+  if (!backlogFile.existsSync()) {
+    print('[ERROR] backlog.json no encontrado.');
+    return;
+  }
+
+  final backlog = jsonDecode(await backlogFile.readAsString());
+  final sprints = backlog['sprints'] as List;
+  
+  final sprintsDir = Directory(p.join(basePath, '.meta', 'sprints'));
+  if (!sprintsDir.existsSync()) {
+    print('[WARN] Directorio .meta/sprints no existe. Creando...');
+    sprintsDir.createSync(recursive: true);
+  }
+
+  bool changedAny = false;
+  final taskFiles = <File>[];
+  
+  // Recursividad para encontrar TASK-*.md
+  await for (final entity in sprintsDir.list(recursive: true)) {
+    if (entity is File && p.basename(entity.path).startsWith('TASK-') && entity.path.endsWith('.md')) {
+      taskFiles.add(entity);
+    }
+  }
+
+  final Set<String> completedInBacklog = {};
+  for (var sprint in sprints) {
+    for (var task in sprint['tasks']) {
+      if (task['status'] == 'DONE') {
+        completedInBacklog.add(task['id']);
+      }
+    }
+  }
+
+  print('[SYNC] Analizando ${taskFiles.length} archivos de tareas...');
+
+  for (final file in taskFiles) {
+    String content = await file.readAsString();
+    final fileName = p.basename(file.path);
+    final taskId = fileName.replaceAll('.md', '');
+    
+    // Detectar si el MD tiene checks
+    final hasX = content.contains('[x]') || content.contains('[X]');
+    final isDoneInBacklog = completedInBacklog.contains(taskId);
+
+    // --- [AUTO-HEAL: Top-Down] ---
+    if (isDoneInBacklog && !hasX) {
+      print('  [AUTO-HEAL] $taskId: Forzando [x] (Criterio: DONE en Backlog)');
+      content = content.replaceAll('[ ]', '[x]');
+      await file.writeAsString(content);
+      changedAny = true;
+    } 
+    // --- [SYNC-UP: Bottom-Up] ---
+    else if (!isDoneInBacklog && hasX) {
+      print('  [SYNC-UP] $taskId: Marcando como DONE (Criterio: [x] en MD)');
+      for (var sprint in sprints) {
+        for (var task in sprint['tasks']) {
+          if (task['id'] == taskId) {
+            task['status'] = 'DONE';
+            changedAny = true;
+          }
+        }
+      }
+    }
+  }
+
+  // --- [TASK.MD SYNC] ---
+  final taskMdFile = File(p.join(basePath, 'task.md'));
+  if (taskMdFile.existsSync()) {
+    print('[SYNC] Sincronizando task.md maestro...');
+    String taskMdContent = await taskMdFile.readAsString();
+    for (var sprint in sprints) {
+      for (var task in sprint['tasks']) {
+        final taskId = task['id'];
+        final isDone = task['status'] == 'DONE';
+        final regex = RegExp('-\\s+\\[\\s*\\]\\s+.*($taskId)');
+        
+        if (isDone && regex.hasMatch(taskMdContent)) {
+          print('  [REPAIR] task.md -> $taskId marked [x]');
+          taskMdContent = taskMdContent.replaceFirst(regex, '- [x] ${task['desc']} ($taskId)');
+          changedAny = true;
+        }
+      }
+    }
+    if (changedAny) await taskMdFile.writeAsString(taskMdContent);
+  }
+
+  if (changedAny) {
+    await backlogFile.writeAsString(JsonEncoder.withIndent('  ').convert(backlog));
+    print('[SUCCESS] Ecosistema sincronizado unánimemente.');
+    
+    final ledger = ForensicLedger();
+    await ledger.appendEntry(
+      sessionId: 'S24-GOLD',
+      type: 'SYNC',
+      task: 'Omni-Sync',
+      detail: 'Reconciliación transversal MD <=> Backlog completada.',
+      basePath: basePath,
+      role: 'KERNEL',
+    );
+  } else {
+    print('[OK] No se detectaron discrepancias semánticas.');
+  }
+}
+
+
 Future<void> _runAuditSimulateTamper(String basePath) async {
   print('=== [GOV] AUDIT SIMULATION: TAMPER TEST ===');
   print('[SIM] Simulando alteración del Ledger en memoria...');
@@ -391,3 +554,68 @@ Future<void> _runAuditSimulateTamper(String basePath) async {
 }
 
 // Final refactor S24-04 complete.
+Future<void> runSealDNA(String basePath, List<String> args) async {
+  print('=== [VANGUARD] OPERACIÓN: SELLO DE ADN BINARIO [DPI-GATE-GOLD] ===');
+  
+  final govPath = p.join(basePath, 'bin', 'gov.exe');
+  final govFile = File(govPath);
+  
+  if (!govFile.existsSync()) {
+    print('[ERROR] No se pudo localizar el binario gov.exe para sellar.');
+    return;
+  }
+
+  // 1. Calcular Hash del Binario Motor
+  final bytes = govFile.readAsBytesSync();
+  final binaryHash = sha256.convert(bytes).toString().toLowerCase();
+  print('  [DNA] Motor Detectado: gov.exe');
+  print('  [DNA] Fingerprint:    $binaryHash');
+
+  // 2. Preparar Desafío Vanguard
+  final vanguard = VanguardCore();
+  final pubKeyFile = File(p.join(basePath, 'vault', 'intel', 'guard_pub.xml'));
+  if (!pubKeyFile.existsSync()) {
+    print('[ERROR] Oráculo ciego: falta vault/intel/guard_pub.xml');
+    return;
+  }
+  final pubKeyXml = pubKeyFile.readAsStringSync();
+
+  final challengeId = await vanguard.issueChallenge(
+    level: 'DNA-CERTIFICATION',
+    project: 'Vanguard Hub',
+    files: ['bin/gov.exe'],
+    basePath: basePath,
+    description: 'Sello de ADN Binario v8.0.1 (Dual Motor Fleet)',
+    forcedId: 'DNA-${binaryHash.substring(0, 8)}',
+  );
+
+  // 3. Esperar Firma RSA (Vanguard Gateway)
+  print('\n[WAIT] Solicitando firma al PO por canal Vanguard...');
+  final isSigned = await vanguard.waitForSignature(
+    basePath: basePath,
+    challenge: challengeId,
+    publicKeyXml: pubKeyXml,
+    timeoutSeconds: 300,
+  );
+
+  if (!isSigned) {
+    print('[FAIL] Desafío de ADN rechazado por el PO.');
+    return;
+  }
+
+  // 4. Persistir Sello Maestro
+  final sigFile = File(p.join(basePath, 'vault', 'intel', 'gov_hash.sig'));
+  await sigFile.writeAsString(binaryHash);
+  
+  print('\n\x1B[32m[SUCCESS] ADN SELLADO. El motor gov.exe es ahora oficial e inalterable.\x1B[0m');
+  
+  // Registro Forense
+  await ForensicLedger().appendEntry(
+    sessionId: 'S24-GOLD',
+    type: 'DNA',
+    task: 'DNA-SEAL',
+    detail: 'Vanguard selló gov.exe: $binaryHash',
+    basePath: basePath,
+    role: 'ARCH'
+  );
+}
