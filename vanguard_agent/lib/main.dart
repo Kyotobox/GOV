@@ -28,7 +28,7 @@ class VanguardElite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanguard Elite 8.1.5',
+      title: 'Vanguard Elite 8.2.0',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -65,7 +65,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   int _zombies = 0;
   String _sprintId = 'WAITING';
   String _activeTaskId = '---';
-  String _activeProjectVersion = 'v8.1.5'; // [S25-07]
+  String _activeProjectVersion = 'v8.2.0'; // [S25-07]
   String _lastPushDate = '---';  // [S25-08]
   bool _pushIsStale = false;     // [S25-08]
   bool _driftAlert = false;
@@ -390,7 +390,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
             }
 
             // [S25-07] Leer versión del backlog
-            final version = data['version'] ?? data['kernel_version'] ?? 'v8.1.5';
+            final version = data['version'] ?? data['kernel_version'] ?? 'v8.2.0';
             _activeProjectVersion = version;
             
             // [S120] Calcular Deuda Pendiente
