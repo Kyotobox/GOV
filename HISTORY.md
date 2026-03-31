@@ -30,3 +30,4 @@
 | 2026-03-31 16:28 | PO | S24-GOLD | d58729273ee809225237e9991d14b1050e28e2e4929ad9502b977f8305a7d452 | BASE | Baseline Seal | v8.2.0: Core sync, BHI 70/30 & Base2 Replication |
 | 2026-03-31 16:31 | PO | S24-GOLD | 5793f6e6e11aa22fe14f5727de34f87fe7a3c9e48a5fa937a349b7e952a7ba3a | BASE | Baseline Seal | v8.2.0: UI version parity & Final replication |
 | 2026-03-31 16:37 | PO | S24-GOLD | ba544a167aec8f711c9917505d83600b668ec50021539f7e73a28ffb284af1a8 | BASE | Baseline Seal | v8.2.0-FINAL: Full sync & Base2 Certification |
+| 2026-03-31 17:46 | ARCH | S24-GOLD | 3d9394872b002727631d02c1c1d8464d2faef32de8ffdec44b4fb53c4318a74f | DNA | DNA-SEAL | Vanguard selló gov.exe: 096120151d88cb3d9b5b256ce46ada407e7e1433e7c77142f54bb01db0a8edff |
