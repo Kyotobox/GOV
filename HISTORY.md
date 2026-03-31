@@ -18,3 +18,4 @@
 | 2026-03-30 06:01 | ARCH | S24-GOLD | 595da08b688fbca95e044cc0090fdc52592c8380e2b1926287b810d1749b00ec | INIT | DPI-INIT | Nuevo proyecto creado: TestProject en C:\Users\Ruben\AppData\Local\Temp\dpi_test_12537567\new_bunker |
 | 2026-03-30 06:15 | ARCH | S24-GOLD | f87ad167d428edbbeb204323952dfe1318bee129ef7cd933f7f1643c588caf57 | EXEC | DPI-ADOPT | Proyecto adoptado: test_adopt_proj en test_adopt_proj. Brechas: 4 |
 | 2026-03-30 06:37 | ARCH | S24-GOLD | eed333e0f8d57c7a6e75bcf3214124b379cb132561e3ed21b93c6dc2f9933350 | INIT | DPI-INIT | Proyecto creado: CLI_Project |
+| 2026-03-31 08:47 | ARCH | S24-GOLD | 269ec4e49d152a6c087e995e8d497602a9355baff3f6e94ab106990975916f0a | EXEC | DPI-ADOPT | Proyecto adoptado: tmp_project en ./tmp_project. Brechas: 4 |
