@@ -22,7 +22,7 @@ void main() {
   });
 
   test('incrementTurns should update session_turns.txt atomically', () async {
-    final service = TelemetryService();
+    final service = TelemetryService(basePath: tmpPath);
     await service.incrementTurns(basePath: tmpPath);
     await service.incrementTurns(basePath: tmpPath);
     await service.incrementTurns(basePath: tmpPath);
@@ -31,7 +31,7 @@ void main() {
   });
 
   test('resetCounters should set session_turns.txt to 0', () async {
-    final service = TelemetryService();
+    final service = TelemetryService(basePath: tmpPath);
     await service.incrementTurns(basePath: tmpPath); // Simular 1 turno
     await service.resetCounters(basePath: tmpPath);
     final content = File(p.join(tmpPath, 'vault', 'intel', 'session_turns.txt')).readAsStringSync();

@@ -11,7 +11,7 @@ void main() async {
   File(p.join(intelDir.path, 'chat_count.txt')).writeAsStringSync('0');
 
   print('Testing incrementTurns...');
-  final service = TelemetryService();
+  final service = TelemetryService(basePath: tmpPath);
   await service.incrementTurns(basePath: tmpPath);
   await service.incrementTurns(basePath: tmpPath);
   await service.incrementTurns(basePath: tmpPath);

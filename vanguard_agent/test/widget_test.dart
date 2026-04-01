@@ -30,13 +30,7 @@ void main() {
 
   testWidgets('Timestamp Resiliency Regression Test', (WidgetTester tester) async {
     // This test ensures that the UI does not crash with short or malformed timestamps
-    final mockHistory = [
-      {'timestamp': '2026-03-29 17:54:33', 'task': 'Standard ISO', 'role': 'PO'},
-      {'timestamp': '2026-03-29T17:54', 'task': 'Short ISO', 'role': 'PO'},
-      {'timestamp': 'INVALID', 'task': 'Malformed', 'role': 'PO'},
-      {'timestamp': null, 'task': 'Null Time', 'role': 'PO'}
-    ];
-
+    
     // We can't easily pump the whole app with mock data without refactoring for DI, 
     // but we can at least verify our logic doesn't throw when used in a controlled build.
     // For now, we manually verify the fix in the code which uses safe split/length checks.

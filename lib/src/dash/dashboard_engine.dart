@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import '../telemetry/telemetry_service.dart';
+import '../services/pulse_aggregator.dart';
 
 /// DashboardEngine: Automates the generation of DASHBOARD.md.
 class DashboardEngine {
   /// Generates the DASHBOARD.md file based on the current pulse.
   Future<void> generate({
-    required PulseSnapshot pulse,
+    required DualPulseData pulse,
     required String basePath,
     String? activeSprint,
     String? activeTask,
@@ -25,11 +25,9 @@ class DashboardEngine {
     buffer.writeln('## 📊 Telemetría SHS (Real-Time)');
     buffer.writeln('| Métrica | Valor | Impacto (CP) |');
     buffer.writeln('| :--- | :--- | :--- |');
-    buffer.writeln('| **Saturación** | $saturation% | ${pulse.cp} |');
-    buffer.writeln('| Turnos (Tools) | ${pulse.cpDetail['tools']} | ${(pulse.cpDetail['tools'] as int) * 1.2} |');
-    buffer.writeln('| Chats | ${pulse.cpDetail['chats']} | ${(pulse.cpDetail['chats'] as int) * 0.5} |');
-    buffer.writeln('| Swelling (Base) | - | ${pulse.cpDetail['swelling']} |');
-    buffer.writeln('| Fatigue Pasiva | - | ${pulse.cpDetail['passive_fatigue']} |');
+    buffer.writeln('| **Saturación** | $saturation% | ${pulse.cp.toStringAsFixed(1)} |');
+    buffer.writeln('| Turnos (Tools) | ${pulse.context.turns} | - |');
+    buffer.writeln('| Zombies | ${pulse.bunker.zombies} | - |');
     buffer.writeln('');
     
     buffer.writeln('## 🚀 Sesión Actual');
@@ -38,7 +36,7 @@ class DashboardEngine {
     buffer.writeln('');
     
     buffer.writeln('## 🛡️ Seguridad & Integridad');
-    buffer.writeln('- **Signed Pulse**: ✅ VERIFICADO (Hash: ${pulse.cpDetail['content_hash'] ?? 'N/A'})');
+    buffer.writeln('- **SHS Pulse**: ${pulse.saturation}%');
     buffer.writeln('- **Kernel Guard**: LOCKED');
     buffer.writeln('');
     

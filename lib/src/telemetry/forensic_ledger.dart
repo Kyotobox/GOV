@@ -22,7 +22,7 @@ class ForensicLedger {
 
     final effectiveRole = role ?? 'AI';
 
-    print('DEBUG: ForensicLedger [${historyFile.absolute.path}] START_APPEND');
+
 
     // VUL-12: Implementamos bloqueo de archivo para evitar condiciones de carrera.
     final lockFile = File(p.join(basePath, 'vault', 'history.lock'));
@@ -57,7 +57,7 @@ class ForensicLedger {
       // VUL-11: Anclamos el hash del ledger en session.lock.
       await _integrity.updateLedgerAnchor(basePath: basePath, tipHash: currentHash);
       
-      print('DEBUG: ForensicLedger [${historyFile.absolute.path}] APPEND_OK (Anchored: ${currentHash.substring(0, 8)})');
+
 
       // VUL-13: Sincronización JSON para Vanguard Agent UI
       final jsonFile = File(p.join(basePath, 'vault', 'intel', 'signature_history.json'));
@@ -83,7 +83,8 @@ class ForensicLedger {
         await Process.run('git', ['add', 'HISTORY.md'], workingDirectory: basePath);
         await Process.run('git', ['commit', '-m', 'gov: ledger update [$type] $task'], workingDirectory: basePath);
       } catch (e) {
-        print('DEBUG: Git auto-commit failed (Expected if not in repo): $e');
+        // Silent fail in non-repo environments or other git issues
+
       }
     } finally {
       await lockRaf.unlock();

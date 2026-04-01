@@ -26,8 +26,6 @@ class GovernanceService {
     if (envPath != null) return envPath;
 
     // Fallback: Si estamos ejecutando desde el binario de Vanguard en el repo
-    final exePath = Platform.resolvedExecutable;
-    final exeDir = Directory(p.dirname(exePath));
     
     // Si estamos en un entorno de build de Flutter, puede ser complejo.
     // Para el entorno del usuario actual, asumimos que el Oráculo está en la ruta conocida

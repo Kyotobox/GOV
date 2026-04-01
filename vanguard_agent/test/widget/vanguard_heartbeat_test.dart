@@ -1,8 +1,5 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vanguard_agent/main.dart';
-import 'package:vanguard_agent/models/project.dart';
 
 void main() {
   testWidgets('Vanguard Heartbeat Sync Engine Test', (WidgetTester tester) async {

@@ -1,6 +1,5 @@
 {
   "project": "Antigravity DPI",
-  "version": "8.2.1",
   "sprints": [
     {
       "id": "S05-DPI",
@@ -500,7 +499,7 @@
       "id": "S26-DEBT",
       "name": "Deuda Técnica y Term-UI",
       "status": "DONE",
-      "goal": "Implementar visualización nativa en terminal y resolver deuda de usabilidad.",
+      "goal": "Implementación de visualización nativa en terminal y resolver deuda de usabilidad.",
       "tasks": [
         {
           "id": "TASK-DPI-S26-01",
@@ -510,7 +509,124 @@
           "required_signatures": ["DEV"]
         }
       ]
+    },
+    {
+      "id": "S27-TOKEN-AWARENESS",
+      "name": "Consciencia de Tokens (SHS-PRESSURE)",
+      "status": "DONE",
+      "goal": "Implementar detección proactiva de límites de salida del modelo (MAX_TOKENS) e integrar presión de tokens en el SHS.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S27-01",
+          "label": "GOV",
+          "desc": "AI-LOG-CRAWLER: Detección de finish_reason: MAX_TOKENS en logs de sesión.",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S27-02",
+          "label": "TEL",
+          "desc": "METRIC-EXPANSION: Cálculo de output_utilization y exposición en ContextState.",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S27-03",
+          "label": "GOV",
+          "desc": "SHS-WEIGHTING: Integración de presión de salida en el pesaje del CUS.",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        }
+      ]
+    },
+    {
+      "id": "S28-FLEET-DECOUPLING",
+      "name": "Orquestación y Desacoplamiento (GOLD-SSOT)",
+      "status": "DONE",
+      "goal": "Finalizar la segregación de Base2, implementar dashboard de flota y automatizar el despliegue agnóstico.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S28-01",
+          "label": "UI",
+          "desc": "DASHBOARD-V2: Visualización de flota multinodo en Vanguard Agent.",
+          "status": "DONE",
+          "required_signatures": ["DEV"]
+        },
+        {
+          "id": "TASK-DPI-S28-02",
+          "label": "ARCH",
+          "desc": "SERVICE-REFACTOR: Migración de Pulse Aggregator a lib/src/services/.",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S28-03",
+          "label": "OPS",
+          "desc": "AGNOSTIC-INSTALLER: Creación del seed_installer.ps1 maestro.",
+          "status": "DONE",
+          "required_signatures": ["DEV"]
+        },
+        {
+          "id": "TASK-DPI-S28-04",
+          "label": "DOC",
+          "desc": "METRICS-SPEC: Documentación técnica del protocolo de cálculo SHS, CUS y BHI.",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        }
+      ]
+    },
+    {
+      "id": "S29-NUCLEUS-V9",
+      "name": "NUCLEUS-V9: Anti-Hallucination Engine",
+      "status": "DONE",
+      "goal": "Migración al kernel v9.0.0 con telemetría determinista y estados de seguridad independientes.",
+      "tasks": [
+        {
+          "id": "TASK-DPI-S29-01",
+          "label": "ARCH",
+          "desc": "Kernel Baseline v9.0.0 & Constant Verification (CONTEXT_WINDOW, OUTPUT_LIMIT)",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S29-02",
+          "label": "TEL",
+          "desc": "Hot-Capture Interceptor & sessionLog Persistence implementation",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S29-03",
+          "label": "TEL",
+          "desc": "Master CUS Redesign: Deterministic Context Pressure Formula",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S29-04",
+          "label": "GOV",
+          "desc": "Independent State Evaluator & Protocol Triggers (LOCKED, SECURITY_HOLD)",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S29-05",
+          "label": "DOC",
+          "desc": "Base2 Midpoint Integration Report & Impact Audit",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        },
+        {
+          "id": "TASK-DPI-S29-06",
+          "label": "SEC",
+          "desc": "Security Hold & Critical Preservation Logic (Write-Lock)",
+          "status": "DONE",
+          "required_signatures": ["ARCH"]
+        }
+      ]
     }
   ],
-  "current_sprint": "S26-READY"
+  "current_sprint": "S29-NUCLEUS-V9",
+  "current_task": "COMPLETED",
+  "version": "9.0.1"
 }

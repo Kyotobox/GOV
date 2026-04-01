@@ -273,9 +273,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Future<void> _refreshTelemetry(Project project) async {
-    final String? oldChallenge = _challenge;
     final double lastSaturation = _saturation;
-    final bool lastDrift = _driftAlert;
 
     // 1. Challenge
     final cFile = File(p.join(project.rootPath, 'vault', 'intel', 'challenge.json'));
@@ -483,10 +481,12 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     if (root == null) return;
     try {
       await Process.run(_getGovPath(root), ['handover'], workingDirectory: root);
-      if (mounted) setState(() {
-        _confirmingHandover = false;
-        _isSealed = true; // [S25-04]
-      });
+      if (mounted) {
+        setState(() {
+          _confirmingHandover = false;
+          _isSealed = true; // [S25-04]
+        });
+      }
       _refreshTelemetry(_selectedProject!);
     } catch (_) {}
   }
@@ -787,13 +787,6 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildZombieCounter(Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: _zombies > 0 ? Colors.red.withValues(alpha: 0.1) : color.withValues(alpha: 0.05), border: Border.all(color: _zombies > 0 ? Colors.redAccent.withValues(alpha: 0.5) : color.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(4)),
-      child: Row(children: [Icon(Icons.bug_report, size: 14, color: _zombies > 0 ? Colors.redAccent : color), const SizedBox(width: 6), Text("ZOMBIES: $_zombies", style: TextStyle(color: _zombies > 0 ? Colors.redAccent : color, fontSize: 12, fontWeight: FontWeight.bold))]),
-    );
-  }
 
   Widget _buildActionButton(IconData icon, String label, VoidCallback onPressed, Color color) {
     return InkWell(onTap: onPressed, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(border: Border.all(color: color.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(4)), child: Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 8), Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold))])));
@@ -893,6 +886,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         cus: _cus, // [S25-03]
         bhi: _bhi, // [S25-03]
         isGov: isGov, 
+        version: _activeProjectVersion, // [NEW] 
         history: _recentHistory, 
         onViewHistory: () => setState(() => _navIndex = 4), 
         timeRemaining: _timeRemaining, 

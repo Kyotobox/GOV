@@ -15,6 +15,7 @@ class TerminalTab extends StatelessWidget {
   final double cus; // [S25-03] NUEVO
   final double bhi; // [S25-03] NUEVO
   final bool isGov;
+  final String version; // [NEW] 
   final List<dynamic> history;
   final VoidCallback onViewHistory;
   final int timeRemaining;
@@ -36,6 +37,7 @@ class TerminalTab extends StatelessWidget {
     required this.cus, // [S25-03]
     required this.bhi, // [S25-03]
     required this.isGov,
+    required this.version, // [NEW]
     required this.history,
     required this.onViewHistory,
     required this.timeRemaining,
@@ -136,6 +138,7 @@ class TerminalTab extends StatelessWidget {
             child: _kvLine("PUNTO DE SALUD", "${(saturation * 100).toInt()}%")
           ),
           _kvLine("ESTADO BÚNKER", "SEGURIZADO"),
+          _kvLine("VERSIÓN KERNEL", version, color: accent), // [NEW]
           _kvLine("ROOT_PROJECT", project?.id.toUpperCase() ?? "NONE"),
           const Divider(color: Colors.white10),
           Tooltip(

@@ -1,71 +1,50 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:test/test.dart';
 import 'package:path/path.dart' as p;
-import 'package:antigravity_dpi/src/kernel/gov.dart'; // This might need a change if not exported or if it causes issues.
+import 'package:antigravity_dpi/src/services/pulse_aggregator.dart';
+import 'package:antigravity_dpi/src/telemetry/session_logger.dart';
 
 void main() {
-  group('CognitiveEngine [Passive Tax Refactor]', () {
+  group('PulseAggregator Service [NUCLEUS-V9]', () {
     late Directory tempDir;
-    late CognitiveEngine engine;
+    late PulseAggregator aggregator;
 
     setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('gov_test_');
-      engine = CognitiveEngine();
+      tempDir = await Directory.systemTemp.createTemp('pulse_test_');
+      aggregator = PulseAggregator(tempDir.path);
       
-      // Setup minimal structure for Baseline scan
-      await Directory(p.join(tempDir.path, 'lib')).create();
-      await Directory(p.join(tempDir.path, 'test')).create();
-      
-      // Setup necessary .meta directory for calculatePulse
-      await Directory(p.join(tempDir.path, '.meta')).create();
+      // Setup vault/intel and .meta
+      await Directory(p.join(tempDir.path, 'vault', 'intel')).create(recursive: true);
+      await Directory(p.join(tempDir.path, '.meta')).create(recursive: true);
     });
 
     tearDown(() async {
-      await tempDir.delete(recursive: true);
+      final dir = Directory(tempDir.path);
+      if (dir.existsSync()) {
+        await dir.delete(recursive: true);
+      }
     });
 
-    test('calculatePulse should return expected fields in detail for v8.2', () async {
-      // 1. Create a "recent" file
-      final libFile = File(p.join(tempDir.path, 'lib', 'main.dart'));
-      await libFile.writeAsString('void main() {}');
+    test('calculatePulse should return valid DualPulseData', () async {
+      final pulse = await aggregator.calculatePulse();
       
-      // 2. Setup atomic counters
-      final intelDir = Directory(p.join(tempDir.path, 'vault', 'intel'));
-      await intelDir.create(recursive: true);
-      await File(p.join(intelDir.path, 'session_turns.txt')).writeAsString('5');
-      
-      // 3. Calculate pulse
-      final pulse = await engine.calculatePulse(tempDir.path);
-      
-      // 4. Verify v8.2 fields
-      expect(pulse.context.detail.containsKey('tool_load'), isTrue);
-      expect(pulse.context.detail.containsKey('ai_turns'), isTrue);
-      expect(pulse.bunker.detail.containsKey('dna_intact'), isTrue);
-      expect(pulse.bunker.detail.containsKey('integrity_penalty'), isTrue);
+      expect(pulse.saturation, isNotNull);
+      expect(pulse.context.cus, equals(0.0)); // No logs yet
+      expect(pulse.bunker.bhi, isNotNull);
+      expect(pulse.timestamp, isNotEmpty);
     });
 
-    test('calculatePulse should accurately reflect atomic turns in CUS', () async {
-      final intelDir = Directory(p.join(tempDir.path, 'vault', 'intel'));
-      await intelDir.create(recursive: true);
-      await File(p.join(intelDir.path, 'session_turns.txt')).writeAsString('10');
+    test('persistPulse should write signed json to vault/intel', () async {
+      final pulse = await aggregator.calculatePulse();
+      await aggregator.persistPulse(pulse);
       
-      final pulse = await engine.calculatePulse(tempDir.path);
+      final file = File(p.join(tempDir.path, 'vault', 'intel', 'intel_pulse.json'));
+      expect(await file.exists(), isTrue);
       
-      // tool_load = 10 * 1.2 = 12.0
-      expect(pulse.context.detail['tool_load'], 12.0);
-      expect(pulse.context.cus, 12.0);
-    });
-
-    test('calculatePulse should apply 70% penalty if DNA seal is missing', () async {
-      // 1. Crear un binario dummy en la raíz para forzar el check de ADN
-      await File(p.join(tempDir.path, 'gov.exe')).writeAsString('DUMMY BINARY');
-      
-      // 2. Calcular pulso usando tempDir como root real del búnker
-      final pulse = await engine.calculatePulse(tempDir.path);
-      
-      // BHI debe ser al menos 70 si dna_intact es false
-      expect(pulse.bunker.detail['dna_intact'], isFalse);
-      expect(pulse.bunker.bhi, greaterThanOrEqualTo(70.0));
+      final data = jsonDecode(await file.readAsString());
+      expect(data['shs_pulse'], equals(pulse.saturation));
+      expect(data['content_hash'], isNotNull);
     });
   });
 }

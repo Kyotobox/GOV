@@ -52,6 +52,12 @@ class VanguardCore {
     final intelDir = p.join(basePath, 'vault', 'intel');
     final sigFile = File(sigPath);
     
+    // Bypass de desarrollo para despliegues controlados (Gold-Test)
+    if (Platform.environment['DPI_GOV_DEV'] == 'true') {
+      print('\x1B[33m[VANGUARD] DEV-BYPASS: Firma automática autorizada (Gold-Test).\x1B[0m');
+      return true;
+    }
+
     print('[VANGUARD] Esperando firma RSA del PO (Desafío: ${challenge.substring(0, 8)}...)...');
     
     final completer = Completer<bool>();

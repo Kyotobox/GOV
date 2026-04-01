@@ -13,8 +13,8 @@ class KeyGenerator {
     keyGen.init(params);
 
     final pair = keyGen.generateKeyPair();
-    final publicKey = pair.publicKey;
-    final privateKey = pair.privateKey;
+    final publicKey = pair.publicKey as RSAPublicKey;
+    final privateKey = pair.privateKey as RSAPrivateKey;
 
     final publicXml = '''
 <RSAKeyValue>

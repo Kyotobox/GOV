@@ -1,6 +1,6 @@
 name: antigravity_dpi
 description: Governance & Security Control Plane for Base2 Kernel DPI
-version: 8.2.0
+version: 8.3.1
 # repository: https://github.com/my_org/my_repo
 
 environment:

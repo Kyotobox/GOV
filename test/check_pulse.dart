@@ -1,10 +1,9 @@
+import 'package:antigravity_dpi/src/services/pulse_aggregator.dart';
 import 'dart:io';
-import 'package:antigravity_dpi/src/telemetry/telemetry_service.dart';
 
 void main() async {
-  final telemetry = TelemetryService();
-  final pulse = await telemetry.computePulse(basePath: Directory.current.path);
-  print('Turns: ${pulse.cpDetail['tools']}');
-  print('CP: ${pulse.cp}');
-  print('Saturation: ${pulse.saturation}%');
+  final basePath = Directory.current.path;
+  final aggregator = PulseAggregator(basePath);
+  final pulse = await aggregator.calculatePulse();
+  print('SHS: ${pulse.saturation}% | CUS: ${pulse.cp}%');
 }

@@ -1,5 +1,5 @@
 {
-  "bin/antigravity_dpi.dart": "cf197b86af96d31c9ce30b85c0cda2d23e0adffc844fed81359f24b72fcd3af9",
+  "bin/antigravity_dpi.dart": "d54fb47f0d87a63e511cb0692300c0e142e02f1560080a07415f89e309eabe7c",
   "lib/antigravity_dpi.dart": "861fc071323d72f1dfbe873790668cb18c0f797d79636ad89035b04e98bc057f",
   "lib/src/core/cache_layer.dart": "7405477e55b65e48858bfb2e303b735344d33de8b728aefff2abf72e5652e0d5",
   "lib/src/core/context_engine.dart": "2b976307c3a7f40d612b25abec1cc987d56e56db460938367097218499daf7e5",
@@ -10,8 +10,9 @@
   "lib/src/core/report_engine.dart": "ce15783e8d7e0abc94c059e1a5110ffe92817296cb801eccabd620d42dce35e3",
   "lib/src/core/test_engine.dart": "cc4abfa0b803832769b64c6d532561ec3db819dce7d3cc0af8ae1ab22a6c1088",
   "lib/src/dash/dashboard_engine.dart": "94a0386112d24722004d4ea9f7a41bd99b906c904dd0416b6ac5c49a7334e3b1",
-  "lib/src/security/integrity_engine.dart": "2df2a6746c6588bf8655bd3c3a1eecff50755f21c4430e9628c3cdd94efaa6cd",
-  "lib/src/security/key_generator.dart": "eb2a770f173e941032aeaf9dd127dfac6a5ea8db2f36bc2085725eec53e71218",
+  "lib/src/kernel/gov.dart": "ffd45b0521b9a1799523fae1ac70d9c68cd61d1964e112e959587915ec829207",
+  "lib/src/security/integrity_engine.dart": "ee33ea493c50fbb1554a25b562ab1c9ccaa33cbaf717315a5140281fb9484a89",
+  "lib/src/security/key_generator.dart": "9a64b3312c62259427abdc6a07075bec4baf589a2859d225a1b0c8882a6c8cc3",
   "lib/src/security/sign_engine.dart": "04f61852e9af3e30d34ea1371e63ab144931eaf670895de7472308e1ac749448",
   "lib/src/security/vanguard_core.dart": "69e62c02102fa91b422bc1ef5efab2fd5296415091b29e9483944f7700d5bb08",
   "lib/src/security/vanguard_watcher.dart": "9820d426b9f5b51439de8515fde2eeeb845911a0bd9b01b6dfeaf5062dd103dc",
@@ -19,5 +20,6 @@
   "lib/src/tasks/compliance_guard.dart": "34538ee8ffc11a1e4cf81c1506e0defb96473113c97baed61aa6875b865d09f5",
   "lib/src/telemetry/forensic_ledger.dart": "7f33a32da9121e23ccf42c2451d40f7bf9572855667fb297d87e17ea3e7f89cd",
   "lib/src/telemetry/telemetry_monitor.dart": "67a4f31164a27e536325da69a4013d35223a04665b7fdca13342828522f00b13",
-  "lib/src/telemetry/telemetry_service.dart": "4b5edbadcc39d2818a5bd2bc246582b6febfc424b40c014a50495077903f6bfc"
+  "lib/src/telemetry/telemetry_service.dart": "4f3cba16c74614c965bce092e02be5fe12e6941ee4ef91e6526eaa7fb2225997",
+  "lib/src/version.dart": "e371531d88f56ad9a93776bef2e12bdb019a387d2afac855a79ef748d48786cb"
 }
