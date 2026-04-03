@@ -83,7 +83,7 @@ class IntegrityEngine {
         // VUL-01: Si el manifiesto dice que debe existir, pero no está, y estamos en entorno DEV
         return false;
       }
-      final actual = await _calculateHash(file);
+      final actual = await calculateFileHash(file);
       if (actual.toLowerCase() != entry.value.toString().toLowerCase()) return false;
     }
     return true;
@@ -91,29 +91,34 @@ class IntegrityEngine {
 
   /// S104-DNA: Real-Time Binary SHA-256 Validation.
   Future<bool> verifyBinaryDNA({required String toolRoot}) async {
-    // S24-GOLD: Bypass para entorno de desarrollo
     if (Platform.environment['DPI_GOV_DEV'] == 'true') return true;
 
-    // S24-GOLD: Localización dinámica del binario para entornos distribuidos
-    String exePath = p.join(toolRoot, 'gov.exe');
-    if (!File(exePath).existsSync()) {
-      exePath = Platform.resolvedExecutable;
-      if (!exePath.endsWith('gov.exe') && !exePath.endsWith('vanguard.exe')) {
-        return true; // No es un binario sellado (ej. dart run)
-      }
+    final String exePath = Platform.resolvedExecutable;
+    if (!exePath.endsWith('gov.exe') && !exePath.endsWith('vanguard.exe')) {
+      return true; 
     }
 
-    final exeFile = File(exePath);
-    final sigFile = File(p.join(p.dirname(exePath), '..', 'vault', 'intel', 'gov_hash.sig'));
+    final exeFile = File(exePath).absolute;
+    final String exeName = p.basename(exeFile.path).toLowerCase();
+    final String sigName = exeName == 'vanguard.exe' ? 'vanguard_hash.sig' : 'gov_hash.sig';
+    final baseDir = p.dirname(exeFile.path);
+    
+    File sigFile = File(p.join(baseDir, '..', 'vault', 'intel', sigName)).absolute;
+    
+    if (!sigFile.existsSync()) {
+      sigFile = File(p.join(toolRoot, 'vault', 'intel', sigName)).absolute;
+    }
+
+    // S30-FIX: Fallback logic for files without .sig extension (Legacy/Variant support)
+    if (!sigFile.existsSync()) {
+       final noSigName = sigName.replaceAll('.sig', '');
+       sigFile = File(p.join(toolRoot, 'vault', 'intel', noSigName)).absolute;
+    }
 
     if (!sigFile.existsSync()) {
-      // Fallback para búsqueda en raíz de proyecto
-      final altSig = File(p.join(toolRoot, 'vault', 'intel', 'gov_hash.sig'));
-      if (!altSig.existsSync()) {
-         print('\x1B[31m[CRITICAL] ALARMA DE ADN: Firma maestra (gov_hash.sig) no encontrada. Integridad comprometida.\x1B[0m');
-         return false; 
-      }
-      return _checkDNA(exeFile, altSig);
+       print('\x1B[31m[CRITICAL] ALARMA DE ADN: Firma maestra ($sigName) no encontrada.\x1B[0m');
+       print('  Buscado en: ${sigFile.path}');
+       return false; 
     }
 
     return _checkDNA(exeFile, sigFile);
@@ -121,14 +126,38 @@ class IntegrityEngine {
 
   Future<bool> _checkDNA(File exeFile, File sigFile) async {
     final bytes = exeFile.readAsBytesSync();
-    final currentHash = sha256.convert(bytes).toString().toLowerCase();
-    final masterHash = sigFile.readAsStringSync().trim().toLowerCase();
+    final currentHash = (await calculateFileHash(exeFile)).toLowerCase();
+    
+    // S30-FIX: Binary-safe DNA decoding
+    String masterHash = '';
+    try {
+      final sigBytes = sigFile.readAsBytesSync();
+      try {
+        masterHash = utf8.decode(sigBytes).trim().toLowerCase();
+      } catch (_) {
+        // [RECOVERY] If binary, we can't just compare hex strings. 
+        // We'll treat the hex representation of the bytes as a hash if it's 64 chars.
+        final hexCandidate = sigBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
+        if (hexCandidate.length == 64) {
+          masterHash = hexCandidate.toLowerCase();
+        } else {
+          print('\x1B[33m[WARNING] DNA Format Mismatch: Signature looks binary and is not a 32-byte hash.\x1B[0m');
+          return false;
+        }
+      }
+    } catch (e) {
+      print('\x1B[31m[FAIL] Error crítico leyendo ADN ($sigFile): $e\x1B[0m');
+      return false;
+    }
 
     if (currentHash == masterHash) {
       return true;
     } else {
-      print('\x1B[31m[CRITICAL] ALARMA DE INTEGRIDAD DE ADN: Hash mismatch detectado.\x1B[0m');
-      print('[INFO] ADN Actual: $currentHash');
+      print('\n\x1B[41m [CRITICAL DNA MISMATCH] \x1B[0m');
+      print('FILE: ${exeFile.absolute.path} (${bytes.length} bytes)');
+      print('SIG:  ${sigFile.absolute.path}');
+      print('ACTUAL: $currentHash');
+      print('EXPECT: $masterHash');
       return false;
     }
   }
@@ -138,26 +167,59 @@ class IntegrityEngine {
     final Map<String, String> manifest = {};
     final binDir = Directory(p.join(basePath, 'bin'));
     final libDir = Directory(p.join(basePath, 'lib'));
+    final agentDir = Directory(p.join(basePath, '_agent'));
+    final scriptsDir = Directory(p.join(basePath, 'scripts'));
+    final docsDir = Directory(p.join(basePath, 'docs'));
+    
+    // S30-SENTINEL: Inclusión holística de plataformas y utilidades (V9.1.0)
+    final scanDirs = <Directory>[];
+    if (await binDir.exists()) scanDirs.add(binDir);
+    if (await libDir.exists()) scanDirs.add(libDir);
+    if (await agentDir.exists()) scanDirs.add(agentDir);
+    if (await scriptsDir.exists()) scanDirs.add(scriptsDir);
+    if (await docsDir.exists()) scanDirs.add(docsDir);
+
+    final platformNames = ['web', 'windows', 'android', 'ios', 'macos', 'linux', 'test'];
+    for (var d in platformNames) {
+      final dir = Directory(p.join(basePath, d));
+      if (await dir.exists()) scanDirs.add(dir);
+    }
 
     final sourceFiles = <File>[];
-    if (await binDir.exists()) sourceFiles.addAll(binDir.listSync(recursive: true).whereType<File>());
-    if (await libDir.exists()) sourceFiles.addAll(libDir.listSync(recursive: true).whereType<File>());
+    for (var dir in scanDirs) {
+      sourceFiles.addAll(dir.listSync(recursive: true).whereType<File>());
+    }
 
     sourceFiles.sort((a, b) => a.path.compareTo(b.path));
 
+    // Extensiones permitidas en el ADN (SENTINEL-EXPANDED)
+    final allowedExt = {
+      '.dart', '.xml', '.json', '.yaml', '.html', 
+      '.png', '.ico', '.js', '.properties', '.gradle',
+      '.md', '.sh', '.ps1', '.bat' 
+    };
+
     for (final file in sourceFiles) {
-      if (file.path.endsWith('.dart')) {
+      final ext = p.extension(file.path).toLowerCase();
+      if (allowedExt.contains(ext)) {
         final relativePath = p.relative(file.path, from: basePath).replaceAll('\\', '/');
-        manifest[relativePath] = await _calculateHash(file);
+        manifest[relativePath] = await calculateFileHash(file);
       }
     }
 
-    // Include critical governance documents in the root
-    final rootDocs = ['VISION.md', 'GEMINI.md', 'backlog.json'];
-    for (final doc in rootDocs) {
-      final file = File(p.join(basePath, doc));
-      if (await file.exists()) {
-        manifest[doc] = await _calculateHash(file);
+    // Include ALL root files that are not explicitly binary or ignored
+    final rootDir = Directory(basePath);
+    final rootFiles = rootDir.listSync().whereType<File>();
+    for (final file in rootFiles) {
+      final name = p.basename(file.path);
+      final ext = p.extension(file.path).toLowerCase();
+      // Ignorar binarios pesados y archivos de sistema
+      if (name.startsWith('.') && name != '.gitignore') continue;
+      if (name.endsWith('.exe') || name.endsWith('.sig') || name.endsWith('.lock')) continue;
+      
+      if (allowedExt.contains(ext) || name == '.gitignore') {
+        final relativePath = name;
+        manifest[relativePath] = await calculateFileHash(file);
       }
     }
 
@@ -185,8 +247,8 @@ class IntegrityEngine {
         continue;
       }
 
-      final actualHash = await _calculateHash(file);
-      results[fileName] = (actualHash.toLowerCase() == expectedHash.toString().toLowerCase());
+      final currentHash = await calculateFileHash(file);
+      results[fileName] = (currentHash.toLowerCase() == expectedHash.toString().toLowerCase());
     }
 
     return results;
@@ -254,7 +316,7 @@ class IntegrityEngine {
     );
   }
 
-  Future<String> _calculateHash(File file) async {
+  Future<String> calculateFileHash(File file) async {
     final bytes = await file.readAsBytes();
     return sha256.convert(bytes).toString().toUpperCase();
   }
@@ -377,14 +439,18 @@ class IntegrityEngine {
     final allowed = {
       'GEMINI.md', 'VISION.md', 'METHODOLOGY.md', 'PROJECT_LOG.md', 
       'task.md', 'backlog.json', 'DASHBOARD.md', 'README.md', 
-      '.gitignore', 'pubspec.yaml', 'pubspec.lock', 'analysis_options.yaml',
-      'session.lock', 'HISTORY.md', 'OP_IMPROVEMENTS.md'
+      'session.lock', 'HISTORY.md', 'OP_IMPROVEMENTS.md', 'BACKLOG_ARCHIVE.json'
+    };
+    // Infraestructura Dart/Flutter — nunca son zombies
+    const kDartPlumbing = {
+      'pubspec.yaml', 'pubspec.lock', 'analysis_options.yaml',
+      '.flutter-plugins', '.flutter-plugins-dependencies',
     };
     final root = Directory(basePath).listSync().whereType<File>();
     final zombies = <String>[];
     for (var f in root) {
       final name = p.basename(f.path);
-      if (allowed.contains(name) || name.startsWith('.') || name.endsWith('.exe')) continue;
+      if (allowed.contains(name) || kDartPlumbing.contains(name) || name.startsWith('.') || name.endsWith('.exe')) continue;
       
       // TASK-*.md are managed by housekeeping relocation but marked as zombies for root
       if (name.startsWith('TASK-') && name.endsWith('.md')) continue;
@@ -408,5 +474,25 @@ class IntegrityEngine {
     } catch (_) {
       return true; // Si no hay dart, no bloqueamos (graceful degradation)
     }
+  }
+
+  /// S30-REV: Verifies an external binary handover signed by PO.
+  Future<bool> verifyBinaryHandover({
+    required String binPath,
+    required String sigPath,
+    required String publicKeyXml,
+  }) async {
+    final binFile = File(binPath);
+    final sigFile = File(sigPath);
+    if (!binFile.existsSync() || !sigFile.existsSync()) return false;
+
+    final binBytes = await binFile.readAsBytes();
+    final sigBytes = await sigFile.readAsBytes();
+    
+    return await _signer.verify(
+      challenge: binBytes,
+      signature: sigBytes,
+      publicKeyXml: publicKeyXml,
+    );
   }
 }

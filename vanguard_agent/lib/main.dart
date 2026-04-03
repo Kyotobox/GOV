@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
 import 'dart:ui';
@@ -28,7 +29,7 @@ class VanguardElite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vanguard Elite 8.2.1',
+      title: 'Vanguard v9.1 SENTINEL',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -42,7 +43,35 @@ class VanguardElite extends StatelessWidget {
   }
 }
 
-// --- [HUD MAIN CONTROLLER] ---
+// --- [MODELS & STATE] ---
+
+class ProjectState {
+  double cus = 0.0;
+  double bhi = 0.0;
+  double saturation = 0.0;
+  int zombies = 0;
+  int turns = 0;
+  String sprintId = 'WAITING';
+  String activeTaskId = '---';
+  String version = '---';
+  bool driftAlert = false;
+  DateTime? lastActionTs;
+  DateTime? takeoverTime;
+  String sessionUuid = '---';
+  List<dynamic> history = [];
+  DateTime sessionStart = DateTime.now();
+  int debts = 0;
+  bool isSealed = false;
+  bool isIntact = true;
+  bool hasUpdate = false;
+  bool hasChallenge = false;
+  
+  // Challenge State
+  String? challenge;
+  String? level;
+  String? description;
+  List<dynamic> recentHistory = [];
+}
 
 class MainHUD extends StatefulWidget {
   const MainHUD({super.key});
@@ -56,39 +85,25 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   List<Project> _projects = [];
   Project? _selectedProject;
   
-  // Health Metrics (V8.0 Dual-Motor)
-  double _cus = 0.0;
-  double _bhi = 0.0;
-  double _saturation = 0.0;
-  bool _isSealed = false; // [S25-04] Estado post-handover
+  // [S30-SEP] Session Islands: Mapeo de estados locales por búnker
+  final Map<String, ProjectState> _states = {};
+  
+  ProjectState get _currentState => _states[_selectedProject?.id] ?? ProjectState();
+
   String? _lastSeenChallengeId;
-  int _zombies = 0;
-  String _sprintId = 'WAITING';
-  String _activeTaskId = '---';
-  String _activeProjectVersion = 'v8.2.0'; // [S25-07]
-  String _lastPushDate = '---';  // [S25-08]
-  bool _pushIsStale = false;     // [S25-08]
-  bool _driftAlert = false;
-  int _debts = 0;
-  int _turns = 0;
-  DateTime _sessionStart = DateTime.now(); // Cold time reference
-  DateTime? _takeoverTime;
-  DateTime? _lastActionTs;
-  String _sessionUuid = '---';
+  String _lastPushDate = '---';  
+  bool _pushIsStale = false;     
   final Set<String> _handledChallenges = {};
   
   // Tactical Actions
   bool _confirmingHandover = false;
   Timer? _heartbeat;
   
-  // Challenge State
-  String? _challenge;
-  String? _level;
-  String? _description;
-  Map<String, dynamic>? _backlog;
-  List<dynamic> _recentHistory = [];
   int _timeRemaining = 0;
   Timer? _countdownTimer;
+  
+  bool _isExecutingCmd = false;
+  String _activeCmdLabel = "";
 
   // Pulse & BlackGate
   late AnimationController _pulseController;
@@ -221,8 +236,6 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     _subscription?.cancel();
     setState(() {
       _selectedProject = project;
-      _challenge = null;
-      _isSealed = false; // [S25-04] Resetear estado SEALED
       _handledChallenges.clear(); 
       if (project.isGovMode) _navIndex = 0;
     });
@@ -232,12 +245,13 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Future<void> _loadSessionTimer(Project project) async {
+    final state = _states.putIfAbsent(project.id, () => ProjectState());
     final lockFile = File(p.join(project.rootPath, '.meta', 'SESSION_LOCKED'));
     if (await lockFile.exists()) {
       final ts = await lockFile.lastModified();
-      setState(() => _sessionStart = ts);
+      setState(() => state.sessionStart = ts);
     } else {
-      setState(() => _sessionStart = DateTime.now());
+      setState(() => state.sessionStart = DateTime.now());
     }
 
     // [TASK-DPI-126-11] Load Active Session Takeover Time
@@ -248,15 +262,15 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         final data = jsonDecode(utf8.decode(bytes));
         if (data['timestamp'] != null) {
           setState(() {
-            _takeoverTime = DateTime.parse(data['timestamp']);
-            _sessionUuid = data['chat_uuid'] ?? 'UNKNOWN';
+            state.takeoverTime = DateTime.parse(data['timestamp']);
+            state.sessionUuid = data['chat_uuid'] ?? 'UNKNOWN';
           });
         }
       } catch (_) {}
     } else {
        setState(() {
-         _takeoverTime = null;
-         _sessionUuid = 'UNLOCKED';
+         state.takeoverTime = null;
+         state.sessionUuid = 'UNLOCKED';
        });
     }
   }
@@ -273,7 +287,8 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Future<void> _refreshTelemetry(Project project) async {
-    final double lastSaturation = _saturation;
+    final state = _states.putIfAbsent(project.id, () => ProjectState());
+    final double lastSaturation = state.saturation;
 
     // 1. Challenge
     final cFile = File(p.join(project.rootPath, 'vault', 'intel', 'challenge.json'));
@@ -283,44 +298,49 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         final data = jsonDecode(utf8.decode(bytes));
         final String newId = data['challenge'];
         
-        // [FIX-UX] Evitar re-mostrar desafíos ya procesados localmente
         if (!_handledChallenges.contains(newId)) {
           if (mounted) {
             setState(() {
-              _challenge = newId;
-              _level = data['level'];
-              _description = data['description'];
+              state.challenge = newId;
+              state.level = data['level'];
+              state.description = data['description'];
             });
           }
         } else {
-          if (mounted) setState(() => _challenge = null);
+          if (mounted) setState(() => state.challenge = null);
         }
       } catch (_) {}
     } else { 
-      if (mounted) setState(() => _challenge = null); 
+      if (mounted) setState(() => state.challenge = null); 
     }
 
     // 1b. Timeout Check
     _countdownTimer?.cancel();
-    if (_challenge != null) {
-      final bytes = await cFile.readAsBytes();
-      final tsStr = (jsonDecode(utf8.decode(bytes)))['timestamp'];
-      if (tsStr != null) {
-        final ts = DateTime.parse(tsStr);
-        final diff = DateTime.now().difference(ts).inSeconds;
-        if (diff > 60) {
-          if (mounted) setState(() { _challenge = null; _timeRemaining = 0; });
-        } else {
-          setState(() => _timeRemaining = 60 - diff);
-          _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-            if (_timeRemaining > 0) {
-              setState(() => _timeRemaining--);
+    if (state.challenge != null) {
+      final cFile = File(p.join(project.rootPath, 'vault', 'intel', 'challenge.json'));
+      if (await cFile.exists()) {
+        try {
+          final bytes = await cFile.readAsBytes();
+          final data = jsonDecode(utf8.decode(bytes));
+          final tsStr = data['timestamp'];
+          if (tsStr != null) {
+            final ts = DateTime.parse(tsStr);
+            final diff = DateTime.now().difference(ts).inSeconds;
+            if (diff > 60) {
+              if (mounted) setState(() { state.challenge = null; _timeRemaining = 0; });
             } else {
-              t.cancel();
-              if (mounted) setState(() => _challenge = null);
+              setState(() => _timeRemaining = 60 - diff);
+              _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+                if (_timeRemaining > 0) {
+                   if (mounted) setState(() => _timeRemaining--);
+                } else {
+                  t.cancel();
+                  if (mounted) setState(() => state.challenge = null);
+                }
+              });
             }
-          });
-        }
+          }
+        } catch (_) {}
       }
     }
 
@@ -332,31 +352,30 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         final data = jsonDecode(utf8.decode(bytes));
         if (mounted) {
           setState(() {
-            _cus = (data['cp_fatigue'] ?? data['cp'] ?? 0.0) / 100.0;
-            _bhi = (data['bhi'] ?? data['hygiene']?['bhi'] ?? 0.0) / 100.0;
-            _saturation = (data['saturation'] ?? 0.0) / 100.0;
-            _zombies = (data['zombies'] ?? 0);
-            _driftAlert = data['drift_alert'] ?? false;
-            _turns = data['cp_detail']?['tools']?.toInt() ?? 0;
-            _sessionUuid = data['session_uuid'] ?? _sessionUuid;
+            state.cus = (data['cp_fatigue'] ?? data['cp'] ?? 0.0) / 100.0;
+            state.bhi = (data['bhi'] ?? data['hygiene']?['bhi'] ?? 0.0) / 100.0;
+            state.saturation = (data['saturation'] ?? 0.0) / 100.0;
+            state.zombies = (data['zombies'] ?? 0);
+            state.driftAlert = data['drift_alert'] ?? false;
+            state.turns = data['cp_detail']?['tools']?.toInt() ?? 0;
+            state.sessionUuid = data['session_uuid'] ?? state.sessionUuid;
             if (data['cp_detail']?['last_action_ts'] != null) {
-              _lastActionTs = DateTime.parse(data['cp_detail']['last_action_ts']);
+              state.lastActionTs = DateTime.parse(data['cp_detail']['last_action_ts']);
             }
             if (data['start_timestamp'] != null) {
-              _takeoverTime = DateTime.parse(data['start_timestamp']);
+              state.takeoverTime = DateTime.parse(data['start_timestamp']);
             }
             
-            // [TASK-125-02] Event-Based Alarms
-            final bool isNewChallenge = _challenge != null && _challenge != _lastSeenChallengeId;
-            final bool isCriticalHit = _saturation >= 0.90 && lastSaturation < 0.90;
+            final bool isNewChallenge = state.challenge != null && state.challenge != _lastSeenChallengeId;
+            final bool isCriticalHit = state.saturation >= 0.90 && lastSaturation < 0.90;
 
             if (isNewChallenge || isCriticalHit) {
                SystemSound.play(SystemSoundType.alert);
                _shimmerController.forward(from: 0.0);
-               _lastSeenChallengeId = _challenge;
+               _lastSeenChallengeId = state.challenge;
             }
 
-            if (_saturation >= 0.90 || (_challenge != null && (_level?.toUpperCase().contains('BLACK') ?? false))) {
+            if (state.saturation >= 0.90 || (state.challenge != null && (state.level?.toUpperCase().contains('BLACK') ?? false))) {
               _pulseController.repeat(reverse: true);
             } else {
               _pulseController.stop();
@@ -375,28 +394,36 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         final data = jsonDecode(utf8.decode(bytes));
         if (mounted) {
           setState(() {
-            _backlog = data;
+            state.sprintId = 'WAITING';
             final sprints = (data['sprints'] as List?) ?? [];
             if (sprints.isNotEmpty) {
               final active = sprints.firstWhere((s) => s['status'] == 'IN_PROGRESS', orElse: () => null);
               if (active != null) {
-                _sprintId = active['id'];
+                state.sprintId = active['id'];
                 final tasks = (active['tasks'] as List?) ?? [];
                 final running = tasks.firstWhere((t) => t['status'] == 'IN_PROGRESS', orElse: () => null);
-                _activeTaskId = running != null ? running['id'] : '---';
+                state.activeTaskId = running != null ? running['id'] : '---';
               }
             }
 
-            // [S25-07] Leer versión del backlog
-            final version = data['version'] ?? data['kernel_version'] ?? 'v8.2.0';
-            _activeProjectVersion = version;
-            
-            // [S120] Calcular Deuda Pendiente
-            _debts = 0;
+            state.version = data['version'] ?? data['kernel_version'] ?? 'v8.2.0';
+            int debts = 0;
             for (var sprint in sprints) {
               final tasks = sprint['tasks'] as List? ?? [];
-              _debts += tasks.where((t) => (t['label'] == 'DEBT' || t['id'].contains('DEBT')) && t['status'] != 'DONE').length;
+              debts += tasks.where((t) => (t['label'] == 'DEBT' || t['id'].contains('DEBT')) && t['status'] != 'DONE').length;
             }
+            state.debts = debts;
+
+            // [TASK-V9-02] Update Detection
+            final binDir = Directory(p.join(project.rootPath, 'bin'));
+            if (binDir.existsSync()) {
+              state.hasUpdate = binDir.listSync().any((f) => f.path.endsWith('.update'));
+            }
+            state.isIntact = !(data['drift_alert'] ?? false); // Drift alert usually means compromise
+            
+            // [TASK-V9-02b] Fleet Challenge Detection
+            final cFile = File(p.join(project.rootPath, 'vault', 'intel', 'challenge.json'));
+            state.hasChallenge = cFile.existsSync();
           });
         }
       } catch (_) {}
@@ -408,7 +435,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
       try {
         final bytes = await hFile.readAsBytes();
         final List<dynamic> history = jsonDecode(utf8.decode(bytes));
-        if (mounted) setState(() => _recentHistory = history.take(5).toList());
+        if (mounted) setState(() => state.recentHistory = history.take(5).toList());
       } catch (_) {}
     }
   }
@@ -416,9 +443,32 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   // --- [TACTICAL ACTIONS] ---
 
   String _getGovPath(String root) {
+    // [V9.1] Prioritize bin/gov.exe, then root, then oracle bin
     final binPath = p.join(root, 'bin', 'gov.exe');
     if (File(binPath).existsSync()) return binPath;
-    return p.join(root, 'gov.exe');
+    final rootPath = p.join(root, 'gov.exe');
+    if (File(rootPath).existsSync()) return rootPath;
+    
+    // Fallback: If node is being bootstrapped, maybe it only exists as an update
+    final updatePath = p.join(root, 'bin', 'gov.exe.update');
+    if (File(updatePath).existsSync()) return updatePath;
+    
+    return "gov"; // Rely on PATH as last resort
+  }
+
+  void _showStatus(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.shareTechMono(fontSize: 11, fontWeight: FontWeight.bold, color: isError ? Colors.redAccent : Colors.cyanAccent)),
+        backgroundColor: Colors.black.withValues(alpha: 0.9),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(side: BorderSide(color: (isError ? Colors.redAccent : Colors.cyanAccent).withValues(alpha: 0.3))),
+      )
+    );
   }
 
   Future<void> _runPulse() async {
@@ -470,10 +520,35 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   Future<void> _runPurge() async {
     final root = _selectedProject?.rootPath;
     if (root == null) return;
+    setState(() { _isExecutingCmd = true; _activeCmdLabel = "PURGING"; });
+    _showStatus("[GOV] Iniciando Housekeeping...");
     try {
-      await Process.run(_getGovPath(root), ['housekeeping'], workingDirectory: root);
+      final res = await Process.run(_getGovPath(root), ['housekeeping'], workingDirectory: root);
+      if (res.exitCode == 0) {
+        _showStatus("[GOV] Purga completada.");
+      } else {
+        _showStatus("[ERROR] Purga fallida: ${res.stderr}", isError: true);
+      }
       _refreshTelemetry(_selectedProject!);
-    } catch (_) {}
+    } catch (e) {
+      _showStatus("[FATAL] Error de sistema: $e", isError: true);
+    }
+    setState(() => _isExecutingCmd = false);
+  }
+
+  Future<void> _runAudit() async {
+    final root = _selectedProject?.rootPath;
+    if (root == null) return;
+    setState(() { _isExecutingCmd = true; _activeCmdLabel = "AUDITING"; });
+    _showStatus("[GOV] Iniciando Auditoría Integral...");
+    try {
+      final res = await Process.run(_getGovPath(root), ['audit'], workingDirectory: root);
+      _showStatus("[GOV] Registro de auditoría actualizado.");
+      _refreshTelemetry(_selectedProject!);
+    } catch (e) {
+      _showStatus("[ERROR] Auditoría interrumpida: $e", isError: true);
+    }
+    setState(() => _isExecutingCmd = false);
   }
 
   Future<void> _runHandover() async {
@@ -484,11 +559,31 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
       if (mounted) {
         setState(() {
           _confirmingHandover = false;
-          _isSealed = true; // [S25-04]
+          _currentState.isSealed = true; 
         });
       }
       _refreshTelemetry(_selectedProject!);
     } catch (_) {}
+  }
+
+  Future<void> _runUpgrade() async {
+    final root = _selectedProject?.rootPath;
+    if (root == null) return;
+    setState(() { _isExecutingCmd = true; _activeCmdLabel = "UPGRADING"; });
+    _showStatus("[GOV] Iniciando Protocolo de Hot-Swap...");
+    try {
+      if (mounted) setState(() => _navIndex = 1); // Switch to terminal to see progress
+      final res = await Process.run(_getGovPath(root), ['upgrade'], workingDirectory: root);
+      if (res.exitCode == 0) {
+         _showStatus("[DONE] Upgrade v9.1 activo.");
+      } else {
+         _showStatus("[VANGUARD] Upgrade requiere intervención: ${res.stderr}", isError: true);
+      }
+      _refreshTelemetry(_selectedProject!);
+    } catch (e) {
+       _showStatus("[FATAL] System error during upgrade: $e", isError: true);
+    }
+    setState(() => _isExecutingCmd = false);
   }
 
   Future<void> _runForcedHandover() async {
@@ -497,42 +592,36 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     if (mounted) setState(() => _confirmingHandover = false);
     try {
       await Process.run(_getGovPath(root), ['handover', '--force'], workingDirectory: root);
-      if (mounted) setState(() => _isSealed = true); // [S25-04]
+      if (mounted) setState(() => _currentState.isSealed = true); 
       _refreshTelemetry(_selectedProject!);
     } catch (_) {}
   }
 
-  Future<void> _runBaseline() async {
-    final root = _selectedProject?.rootPath;
-    if (root == null) return;
-    try {
-      await Process.run(_getGovPath(root), ['baseline', 'HUD Update'], workingDirectory: root);
-      _refreshTelemetry(_selectedProject!);
-    } catch (_) {}
-  }
 
 
   @override
   Widget build(BuildContext context) {
     final bool isGov = _selectedProject?.isGovMode ?? false;
+    final state = _states[_selectedProject?.id] ?? ProjectState();
     return AnimatedBuilder(
       animation: _glowController,
       builder: (context, _) {
-        final Color themeColor = _challenge == null ? Colors.cyanAccent : _getThemeColor(_level ?? "");
-        final Color accent = Color.lerp(themeColor, Colors.redAccent, isGov ? 0.0 : _saturation)!;
-        final Color bgColor = _challenge == null ? const Color(0xFF000508) : themeColor.withValues(alpha: 0.1);
+        final Color projectColor = _getProjectColor(_selectedProject?.name ?? "");
+        final Color themeColor = state.challenge == null ? projectColor : _getThemeColor(state.level ?? "");
+        final Color accent = Color.lerp(themeColor, Colors.redAccent, isGov ? 0.0 : state.saturation)!;
+        final Color bgColor = state.challenge == null ? const Color(0xFF000508) : themeColor.withValues(alpha: 0.1);
 
         return Scaffold(
           body: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF000508),
-              gradient: _challenge != null ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [bgColor, const Color(0xFF000508)]) : null,
+              gradient: state.challenge != null ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [bgColor, const Color(0xFF000508)]) : null,
             ),
             child: Stack(
               children: [
                 Row(
                   children: [
-                    if (!isGov) _buildSidebar(accent),
+                    _buildSidebar(accent),
                     Expanded(
                       child: Column(
                         children: [
@@ -543,8 +632,13 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
+                // [V9.1] Bottom Left Version HUD
+                Positioned(
+                  bottom: 24, left: 104,
+                  child: _buildBottomHUD(accent),
+                ),
                 // [TASK-119-06] BlackGate Critical Pulse Overlay
-                if (_saturation >= 0.90 || (_challenge != null && (_level?.toUpperCase().contains('BLACK') ?? false))) 
+                if (state.saturation >= 0.90 || (state.challenge != null && (state.level?.toUpperCase().contains('BLACK') ?? false))) 
                   Positioned.fill(
                     child: IgnorePointer(
                       child: AnimatedBuilder(
@@ -569,18 +663,21 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
           width: 80,
           decoration: BoxDecoration(
             border: Border(right: BorderSide(color: color.withValues(alpha: 0.15))),
-            color: Colors.black.withValues(alpha: 0.7),
+            color: Colors.black.withValues(alpha: 0.9), // Darker for better contrast
           ),
           child: Column(
             children: [
               const SizedBox(height: 32),
-              _buildNavIcon(0, Icons.radar, "OPERACIONES", color),
-              _buildNavIcon(1, Icons.history, "REGISTRO", color),
-              _buildNavIcon(2, Icons.settings, "PLANIFICACIÓN", color),
-              _buildNavIcon(3, Icons.add_moderator, "DPI-INIT", color),
-              _buildNavIcon(4, Icons.auto_awesome, "DPI-ADOPT", color),
+              _buildNavIcon(0, Icons.terminal, "OPS", color),
+              _buildNavIcon(1, Icons.history, "LEDGER", color),
+              _buildNavIcon(2, Icons.map, "PLAN", color),
+              const Divider(color: Colors.white10),
+              _buildNavIcon(3, Icons.add_moderator, "INIT", color),
+              _buildNavIcon(4, Icons.auto_awesome, "ADOPT", color),
               _buildNavIcon(5, Icons.search, "FORENSIC", color),
               const Spacer(),
+              _buildFleetRadar(color),
+              const SizedBox(height: 20),
               Padding(padding: const EdgeInsets.only(bottom: 24), child: _buildEmergencyHandoverButton(color)),
             ],
           ),
@@ -589,7 +686,81 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildFleetRadar(Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: _projects.map((p) {
+          final pState = _states[p.id] ?? ProjectState();
+          final bool needsSig = pState.hasChallenge;
+          final bool needsUpgrade = pState.hasUpdate;
+          final bool isSelected = _selectedProject?.id == p.id;
+          
+          return Tooltip(
+            message: "Node: ${p.name}\n${needsSig ? 'REQUIERE FIRMA RSA' : ''}${needsUpgrade ? '\nUPDATE DISPONIBLE' : ''}",
+            child: InkWell(
+              onTap: () => _selectProject(p),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  border: Border.all(color: isSelected ? color : color.withValues(alpha: 0.1)),
+                  borderRadius: BorderRadius.circular(4),
+                  color: isSelected ? color.withValues(alpha: 0.05) : Colors.transparent,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(p.name[0].toUpperCase(), style: TextStyle(color: isSelected ? color : Colors.white24, fontWeight: FontWeight.bold, fontSize: 13)),
+                    if (needsSig) Positioned(top: 2, right: 2, child: Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.orangeAccent, shape: BoxShape.circle))),
+                    if (needsUpgrade) Positioned(bottom: 2, right: 2, child: Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle))),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildBottomHUD(Color color) {
+     final state = _states[_selectedProject?.id] ?? ProjectState();
+     return ClipRRect(
+       borderRadius: BorderRadius.circular(4),
+       child: BackdropFilter(
+         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+         child: Container(
+           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+           decoration: BoxDecoration(
+             color: Colors.black.withValues(alpha: 0.8),
+             border: Border.all(color: color.withValues(alpha: 0.2)),
+           ),
+           child: Row(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               const Icon(Icons.security, size: 10, color: Colors.white24),
+               const SizedBox(width: 8),
+               Text("GOV ${state.version}-SENTINEL", style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white38)),
+               const SizedBox(width: 12),
+               const VerticalDivider(color: Colors.white10),
+               const SizedBox(width: 12),
+               Text(_selectedProject?.name.toUpperCase() ?? "UNKNOWN", style: TextStyle(color: _getProjectColor(_selectedProject?.name ?? ""), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+               const SizedBox(width: 12),
+               Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                 decoration: BoxDecoration(color: state.isIntact ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2)),
+                 child: Text(state.isIntact ? "SEALED" : "TAMPERED", style: TextStyle(color: state.isIntact ? Colors.greenAccent : Colors.redAccent, fontSize: 7, fontWeight: FontWeight.bold)),
+               )
+             ],
+           ),
+         ),
+       ),
+     );
+  }
+
   Widget _buildEmergencyHandoverButton(Color color) {
+    final state = _states[_selectedProject?.id] ?? ProjectState();
     if (_confirmingHandover) {
       return Container(
         padding: const EdgeInsets.all(8),
@@ -608,14 +779,23 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
                     backgroundColor: const Color(0xFF000508),
                     shape: RoundedRectangleBorder(side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3))),
                     title: const Text('HANDOVER FORZADO', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                    content: const Text(
-                      '⚠️ El handover forzado sella la sesión sin verificación de integridad.\n\n'
-                      'Consecuencias:\n'
-                      '• Se omite la firma RSA del sello\n'
-                      '• La fatiga acumulada se pierde sin registro\n'
-                      '• El próximo takeover comenzará sin historial\n\n'
-                      'Usar solo si el handover normal falla.',
-                      style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.6),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          '⚠️ El handover forzado sella la sesión sin verificación de integridad.\n\n'
+                          'Consecuencias:\n'
+                          '• Se omite la firma RSA del sello\n'
+                          '• La fatiga acumulada se pierde sin registro\n'
+                          '• El próximo takeover comenzará sin historial\n\n',
+                          style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.6),
+                        ),
+                        Text('SESSION UUID: ${state.sessionUuid.toUpperCase()}',
+                            style: GoogleFonts.shareTechMono(color: Colors.white54, fontSize: 10)),
+                        const SizedBox(height: 4),
+                        Text('DNA HASH: [${state.sessionUuid.hashCode.toRadixString(16).toUpperCase()}]',
+                            style: GoogleFonts.shareTechMono(color: Colors.white54, fontSize: 10)),
+                      ],
                     ),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR', style: TextStyle(color: Colors.white38, fontSize: 10))),
@@ -658,6 +838,14 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
     return Colors.cyanAccent;
   }
 
+  Color _getProjectColor(String name) {
+    final String n = name.toUpperCase();
+    if (n.contains('GOV') || n.contains('KYOTO')) return const Color(0xFFFFD700); // Dorado
+    if (n.contains('BASE2')) return Colors.blueAccent; // Azul
+    if (n.contains('MINIDUO')) return Colors.deepPurpleAccent; // Violeta
+    return Colors.cyanAccent; // Default
+  }
+
   Widget _buildNavIcon(int index, IconData icon, String label, Color color) {
     final bool active = _navIndex == index;
     return InkWell(
@@ -678,6 +866,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader(Color color, Color accent, bool isGov) {
+    final state = _states[_selectedProject?.id] ?? ProjectState();
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, _) => ClipRect(
@@ -694,12 +883,12 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
                 Container(
                   width: 14, height: 14, 
                   decoration: BoxDecoration(
-                    color: _isSealed ? Colors.grey : color, 
+                    color: state.isSealed ? Colors.grey : color, 
                     shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: (_isSealed ? Colors.grey : color).withValues(alpha: 0.5), blurRadius: 10, spreadRadius: 2)]
+                    boxShadow: [BoxShadow(color: (state.isSealed ? Colors.grey : color).withValues(alpha: 0.5), blurRadius: 10, spreadRadius: 2)]
                   )
                 ),
-                if (_isSealed) ...[
+                if (state.isSealed) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -713,27 +902,38 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
                     value: _selectedProject,
                     dropdownColor: const Color(0xFF000508),
                     icon: Icon(Icons.keyboard_arrow_down, color: color, size: 16),
-                    items: _projects.map((p) => DropdownMenuItem(value: p, child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(p.name, style: TextStyle(color: color, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: color.withValues(alpha: 0.2))),
-                          child: Text(_activeProjectVersion, style: const TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
-                        )
-                      ],
-                    ))).toList(),
+                    items: _projects.map((p) {
+                      final pState = _states[p.id] ?? ProjectState();
+                      final bool pNeedsSig = pState.hasChallenge;
+                      
+                      return DropdownMenuItem(value: p, child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (pNeedsSig) ...[
+                            const Icon(Icons.circle, color: Colors.orangeAccent, size: 8),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(p.name, style: TextStyle(color: pNeedsSig ? Colors.orangeAccent : color, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4), border: Border.all(color: color.withValues(alpha: 0.2))),
+                            child: Text(pState.version, style: const TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
+                          )
+                        ],
+                      ));
+                    }).toList(),
                     onChanged: (p) => p != null ? _selectProject(p) : null,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(_sprintId, style: TextStyle(color: color.withValues(alpha: 0.4), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                _headerMetric(label: 'CUS', value: state.cus, color: _getMetricColor(state.cus)),
+                _headerMetric(label: 'BHI', value: state.bhi, color: _getMetricColor(state.bhi)),
+                _headerMetric(label: 'SHS', value: state.saturation, color: _getMetricColor(state.saturation)),
                 const SizedBox(width: 20),
                 _buildSessionHUD(color),
                 const Spacer(),
-                if (_driftAlert) _buildDriftWarning(color),
+                if (state.driftAlert) _buildDriftWarning(color),
                 const SizedBox(width: 16),
                 if (!isGov) _buildOperationsHeader(color, accent),
               ],
@@ -745,39 +945,56 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Widget _buildOperationsHeader(Color color, Color accent) {
+    final state = _states[_selectedProject?.id] ?? ProjectState();
+    final bool needsUpgrade = !state.isIntact && state.hasUpdate;
+    
     return Row(
       children: [
-        _buildMetricBox("ZOMBIES", "$_zombies", _zombies > 0 ? Colors.redAccent : color),
+        _headerMetric(label: 'ZOMBIES', value: state.zombies.toDouble(), color: _getMetricColor(state.zombies.toDouble())),
         const SizedBox(width: 8),
         _buildActionButton(Icons.cleaning_services, "PURGE", _runPurge, color),
         const SizedBox(width: 8),
-        _buildActionButton(Icons.check_circle_outline, "BASELINE", _runBaseline, accent),
+        if (state.hasUpdate)
+          _buildActionButton(
+            Icons.system_update, 
+            "UPGRADE", 
+            _runUpgrade, 
+            needsUpgrade ? Colors.orangeAccent : Colors.greenAccent
+          ),
+        const SizedBox(width: 8),
+        _buildActionButton(
+          Icons.security, 
+          "AUDIT", 
+          _runAudit, 
+          needsUpgrade ? Colors.orangeAccent : color
+        ),
       ],
     );
   }
 
-  Widget _buildMetricBox(String label, String value, Color color) {
+  Color _getMetricColor(double val) {
+    if (val >= 0.90) return Colors.redAccent;
+    if (val >= 0.80) return Colors.orangeAccent;
+    return const Color(0xFF00E5FF);
+  }
+
+  Widget _headerMetric({required String label, required double value, required Color color}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-        borderRadius: BorderRadius.circular(6),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withValues(alpha: 0.1), Colors.transparent],
-        ),
-      ),
-      child: Row(
+      margin: const EdgeInsets.only(left: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("$label:", style: TextStyle(color: color.withValues(alpha: 0.4), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-          const SizedBox(width: 8),
-          Text(value, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          Text(label, style: TextStyle(color: color.withValues(alpha: 0.5), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const SizedBox(height: 2),
+          Text("${(value * 100).toInt()}%", style: GoogleFonts.shareTechMono(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
+
+  // DEPRECATED: Use _buildHeaderMetric or _buildBottomHUD
+
 
   Widget _buildDriftWarning(Color color) {
     return Container(
@@ -789,7 +1006,35 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
 
 
   Widget _buildActionButton(IconData icon, String label, VoidCallback onPressed, Color color) {
-    return InkWell(onTap: onPressed, child: Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(border: Border.all(color: color.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(4)), child: Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 8), Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold))])));
+    final bool isBusy = _isExecutingCmd && label.contains(_activeCmdLabel.substring(0, 3));
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 200),
+        scale: isBusy ? 0.95 : 1.0,
+        child: InkWell(
+          onTap: isBusy ? null : onPressed, 
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), 
+            decoration: BoxDecoration(
+              color: isBusy ? color.withValues(alpha: 0.1) : Colors.transparent,
+              border: Border.all(color: isBusy ? color : color.withValues(alpha: 0.3)), 
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: isBusy ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 10)] : null,
+            ), 
+            child: Row(
+              children: [
+                if (isBusy) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white24))
+                else Icon(icon, size: 16, color: color), 
+                const SizedBox(width: 8), 
+                Text(isBusy ? "EXECUTING..." : label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold))
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSessionHUD(Color color) {
@@ -803,9 +1048,9 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Widget _buildSessionChip(Color color) {
-    final String displayUuid = _sessionUuid.length > 8 ? _sessionUuid.substring(0, 8) : _sessionUuid;
+    final String displayUuid = _currentState.sessionUuid.length > 8 ? _currentState.sessionUuid.substring(0, 8) : _currentState.sessionUuid;
     return Tooltip(
-      message: "Session Fingerprint (UUID): $_sessionUuid\nIdentificador único del hilo de ejecución actual.",
+      message: "Session Fingerprint (UUID): ${_currentState.sessionUuid}\nIdentificador único del hilo de ejecución actual.",
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -831,7 +1076,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         _buildTimerItem(
           icon: Icons.timer, 
           label: "SESSION", 
-          startTime: _takeoverTime ?? _sessionStart, 
+          startTime: _currentState.takeoverTime ?? _currentState.sessionStart, 
           color: color,
           tooltip: "SESSION: Tiempo transcurrido desde el inicio de la sesión activa (Takeover).",
         ),
@@ -839,7 +1084,7 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
         _buildTimerItem(
           icon: Icons.history, 
           label: "IDLE", 
-          startTime: _lastActionTs ?? DateTime.now(), 
+          startTime: _currentState.lastActionTs ?? DateTime.now(), 
           color: color.withValues(alpha: 0.6),
           tooltip: "IDLE: Tiempo transcurrido desde la última acción registrada.",
         ),
@@ -875,35 +1120,38 @@ class _MainHUDState extends State<MainHUD> with TickerProviderStateMixin {
   }
 
   Widget _buildCurrentTab(Color accent, bool isGov) {
+    final state = _states[_selectedProject?.id] ?? ProjectState();
+    
     switch (_navIndex) {
       case 0: return TerminalTab(
-        challenge: _challenge, 
-        level: _level, 
-        description: _description, 
+        challenge: state.challenge, 
+        level: state.level, 
+        description: state.description, 
         project: _selectedProject, 
         accent: accent, 
-        saturation: _saturation, 
-        cus: _cus, // [S25-03]
-        bhi: _bhi, // [S25-03]
+        saturation: state.saturation, 
+        cus: state.cus, 
+        bhi: state.bhi, 
         isGov: isGov, 
-        version: _activeProjectVersion, // [NEW] 
-        history: _recentHistory, 
-        onViewHistory: () => setState(() => _navIndex = 4), 
-        timeRemaining: _timeRemaining, 
-        activeTaskId: _activeTaskId, 
-        debts: _debts, 
-        turns: _turns,
-        lastPushDate: _lastPushDate, // [S25-08]
-        pushIsStale: _pushIsStale,   // [S25-08]
+        version: state.version, 
+        history: state.recentHistory, 
+        onViewHistory: () => setState(() => _navIndex = 1), 
+        pushIsStale: _pushIsStale,
         onChallengeCleared: () {
-          if (_challenge != null) _handledChallenges.add(_challenge!);
-          setState(() => _challenge = null);
+          if (state.challenge != null) _handledChallenges.add(state.challenge!);
+          setState(() => state.challenge = null);
         },
+        // [S120] Added missing parameters
+        timeRemaining: _timeRemaining,
+        activeTaskId: state.activeTaskId,
+        debts: state.debts,
+        turns: state.turns,
+        lastPushDate: _lastPushDate,
       );
-      case 1: return RegistryTab(project: _selectedProject, backlog: _backlog);
+      case 1: return RegistryTab(project: _selectedProject, backlog: null); // Backlog not stored in state yet, but null is fine for now
       case 2: return PlanningTab(project: _selectedProject);
       case 3: return const DpiInitWizardScreen(); 
-      case 4: return const DpiAdoptWizardScreen(); // [TASK-121-01]
+      case 4: return const DpiAdoptWizardScreen(); 
       case 5: return ForensicTab(project: _selectedProject);
       default: return const Center(child: Text("OFFLINE"));
     }

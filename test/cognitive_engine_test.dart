@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:test/test.dart';
 import 'package:path/path.dart' as p;
 import 'package:antigravity_dpi/src/services/pulse_aggregator.dart';
-import 'package:antigravity_dpi/src/telemetry/session_logger.dart';
 
 void main() {
   group('PulseAggregator Service [NUCLEUS-V9]', () {

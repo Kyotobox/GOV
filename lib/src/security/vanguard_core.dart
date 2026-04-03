@@ -17,10 +17,11 @@ class VanguardCore {
     String? forcedId,
   }) async {
     final random = Random.secure();
-    final nonce = List<int>.generate(16, (i) => random.nextInt(256));
-    final nonceHex = nonce.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+    final nonce = List<int>.generate(32, (i) => random.nextInt(256));
+    final nonceB64 = base64UrlEncode(nonce).replaceAll('=', '');
     
-    final challengeId = forcedId ?? 'AUTH-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-$nonceHex';
+    final projectSlug = project.toUpperCase().replaceAll(' ', '_');
+    final challengeId = forcedId ?? 'AUTH-$projectSlug-${DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('-', '').split('.')[0]}-$nonceB64';
     final intelDir = p.join(basePath, 'vault', 'intel');
     final challengeFile = File(p.join(intelDir, 'challenge.json'));
 
@@ -109,6 +110,13 @@ class VanguardCore {
           }
           final data = jsonDecode(content);
           if (data['challenge'] != challenge) return false;
+          
+          // VUL-V9-02b: Validar que el desafío pertenece a este proyecto
+          final projectSlug = data['project']?.toString().toUpperCase().replaceAll(' ', '_');
+          if (challenge.contains('AUTH-') && !challenge.contains(projectSlug ?? 'UNKNOWN')) {
+            stderr.writeln('[VANGUARD-CRITICAL] Intento de firma cruzada detectado. El desafío no coincide con el proyecto.');
+            return false;
+          }
           
           final signatureB64 = data['signature'];
           if (signatureB64 == null) return false;

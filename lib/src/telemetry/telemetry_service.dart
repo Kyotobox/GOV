@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'session_logger.dart';
+import '../version.dart';
 
 /// TelemetryService: Centralized SHS calculation and Structured interaction logging.
 /// S28-02: Migrated and hardened for NUCLEUS-V9 (v9.0.0).
@@ -31,6 +32,8 @@ class TelemetryService {
       'saturation': pulse.saturation,
       'cp_detail': pulse.cpDetail,
       'timestamp': pulse.timestamp,
+      'session_uuid': pulse.sessionUuid ?? 'MANUAL',
+      'kernel_version': kKernelVersion,
       
       // --- LEGACY COMPATIBILITY (Unblinding Vanguard Agent) ---
       'shs_pulse': pulse.saturation,
@@ -106,6 +109,21 @@ class TelemetryService {
     // [HOT-CAPTURE] S29-02
     await _logger.resetLog();
   }
+
+  /// [HOT-CAPTURE] S29-02: Records granular metadata from API responses.
+  Future<void> updateMetadata({
+    required int promptTokens,
+    required int outputTokens,
+    String? finishReason,
+  }) async {
+    await _logger.captureInteraction(
+      type: 'INTERACTION',
+      detail: 'API Metadata Capture',
+      promptTokens: promptTokens,
+      outputTokens: outputTokens,
+      finishReason: finishReason,
+    );
+  }
 }
 
 class PulseSnapshot {
@@ -113,12 +131,14 @@ class PulseSnapshot {
   final int saturation;
   final Map<String, dynamic> cpDetail;
   final String timestamp;
+  final String? sessionUuid;
 
   PulseSnapshot({
     required this.cp,
     required this.saturation,
     required this.cpDetail,
     required this.timestamp,
+    this.sessionUuid,
   });
 }
 

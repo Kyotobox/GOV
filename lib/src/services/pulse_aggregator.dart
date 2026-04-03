@@ -2,9 +2,11 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:math';
 import 'package:path/path.dart' as p;
+import 'package:crypto/crypto.dart';
 import '../telemetry/telemetry_service.dart';
 import '../telemetry/session_logger.dart';
 import '../security/integrity_engine.dart';
+import '../version.dart';
 
 enum EvaluatorState { NOMINAL, WARNING, LOCKED, SECURITY_HOLD }
 
@@ -46,11 +48,16 @@ class PulseAggregator {
     final context = await _contextEngine.calculateCUS(basePath);
     final bunker = await _bunkerEngine.calculateBHI(basePath);
     
+    // S30-SEP: Project-Bound UUID (Isolation)
+    final globalUuid = Platform.environment['VANGUARD_CHAT_UUID'] ?? 'MANUAL';
+    final projectSeed = p.canonicalize(basePath).toLowerCase();
+    final projectUuid = sha256.convert(utf8.encode('$projectSeed:$globalUuid')).toString().substring(0, 32);
+
     return DualPulseData(
       context: context,
       bunker: bunker,
       timestamp: DateTime.now().toIso8601String(),
-      sessionUuid: Platform.environment['VANGUARD_CHAT_UUID'] ?? 'MANUAL',
+      sessionUuid: projectUuid,
     );
   }
 
@@ -73,6 +80,7 @@ class PulseAggregator {
           'max_tokens_detected': data.context.maxTokensDetected,
         },
         timestamp: data.timestamp,
+        sessionUuid: data.sessionUuid,
       ),
       basePath: basePath,
     );
@@ -120,14 +128,15 @@ class DualPulseData {
     'zombies': bunker.zombies,
     'evaluator_state': evaluation.state.name,
     'protocol': evaluation.protocol,
+    'kernel_version': kKernelVersion,
   };
 }
 
 // --- NUCLEUS-V9 ENGINES (Migrated to Services) ---
 
 class ContextEngine {
-  static const int kContextWindow = 1000000;
-  static const int kOutputLimit = 8000;
+  static const int kContextWindow = 500000; // S29-01
+  static const int kOutputLimit = 8192;   // S29-01
 
   Future<ContextState> calculateCUS(String basePath) async {
     final logger = SessionLogger(basePath: basePath);
@@ -135,55 +144,50 @@ class ContextEngine {
     
     if (logs.isEmpty) return _calculateLegacyCUS(basePath);
 
-    double totalCP = 0.0;
-    int totalEstimatedTokens = 0;
-    double maxUtilization = 0.0;
-    bool maxTokensFound = false;
+    int totalPromptTokens = 0;
+    int maxOutputTokens = 0;
+    int truncationEvents = 0;
+    bool latestTruncated = false;
 
     for (final log in logs) {
-      final type = log['type'] as String;
-      final detail = (log['detail'] as String).toUpperCase();
-      final tokens = log['tokens'] as int;
+      final pTokens = log['prompt_tokens'] as int? ?? 0;
+      final oTokens = log['output_tokens'] as int? ?? 0;
+      final fReason = log['finish_reason'] as String? ?? 'stop';
 
-      if (type == 'TOOL') {
-        if (detail.contains('REPLACE') || detail.contains('WRITE')) {
-          totalCP += 2.2;
-        } else if (detail.contains('COMMAND') || detail.contains('SEARCH')) {
-          totalCP += 1.5;
-        } else {
-          totalCP += 0.8;
-        }
-      } else if (type == 'CHAT') {
-        totalCP += 0.7;
+      totalPromptTokens += pTokens;
+      if (oTokens > maxOutputTokens) maxOutputTokens = oTokens;
+      
+      if (fReason == 'MAX_TOKENS') {
+        truncationEvents++;
+        latestTruncated = (log == logs.last);
       }
-
-      totalEstimatedTokens += tokens;
-      if (log['finish_reason'] == 'MAX_TOKENS') maxTokensFound = true;
-
-      final double util = tokens.toDouble() / kOutputLimit;
-      if (util > maxUtilization) maxUtilization = util;
     }
 
-    final double contextRatio = totalEstimatedTokens / kContextWindow;
-    if (contextRatio > 0.8) {
-      final frictionMultiplier = 1.0 + ((contextRatio - 0.8) * 10.0);
-      totalCP *= frictionMultiplier;
-    }
+    final double turnsWeight = logs.length * 1.2;
+    final double inputPressure = totalPromptTokens / kContextWindow;
+    final double outputPressure = maxOutputTokens / kOutputLimit;
+    final double truncationRate = truncationEvents / logs.length;
+    final double immediateSpike = latestTruncated ? 15.0 : 0.0;
 
-    if (maxTokensFound) totalCP += 45.0;
+    final double totalCP = turnsWeight + 
+                         (inputPressure * 50.0) + 
+                         (outputPressure * 50.0) + 
+                         (truncationRate * 40.0) + 
+                         immediateSpike;
 
     return ContextState(
       cus: totalCP.clamp(0.0, 100.0),
-      tokens: totalEstimatedTokens,
+      tokens: totalPromptTokens + maxOutputTokens, // Combined estimation for reporting
       turns: logs.length,
-      outputUtilization: maxUtilization.clamp(0.0, 1.0),
-      maxTokensDetected: maxTokensFound,
+      outputUtilization: outputPressure.clamp(0.0, 1.0),
+      maxTokensDetected: truncationEvents > 0,
       detail: {
-        'weighted_interaction_cp': totalCP,
-        'context_ratio': contextRatio.toStringAsFixed(3),
-        'friction_active': contextRatio > 0.8,
-        'interaction_count': logs.length,
-        'atomic_focus': true,
+        'deterministic_cus': true,
+        'input_pressure': inputPressure.toStringAsFixed(3),
+        'output_pressure': outputPressure.toStringAsFixed(3),
+        'truncation_rate': truncationRate.toStringAsFixed(3),
+        'immediate_spike': immediateSpike > 0,
+        'turns_weight': turnsWeight.toStringAsFixed(1),
       },
     );
   }
@@ -224,7 +228,8 @@ class BunkerHealthEngine {
         final data = jsonDecode(sessionLock.readAsStringSync());
         final startTs = DateTime.parse(data['timestamp']);
         final diff = DateTime.now().difference(startTs).inMinutes;
-        timePenalty = (diff / 15.0).clamp(0.0, 15.0);
+        // S30-REV: Softer time penalty (30m per point, max 10)
+        timePenalty = (diff / 30.0).clamp(0.0, 10.0);
       } catch (_) {}
     }
 

@@ -199,6 +199,7 @@ class TerminalTab extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _kvLine("TIEMPO RESTANTE", "${timeRemaining}s", small: true),
+          _kvLine("BÚNKER", project?.name ?? "DESCONOCIDO", small: true),
           const SizedBox(height: 12),
           Text(challenge!, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: -1)),
           const SizedBox(height: 24),

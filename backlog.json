@@ -1,632 +1,146 @@
 {
-  "project": "Antigravity DPI",
-  "sprints": [
-    {
-      "id": "S05-DPI",
-      "name": "Hardening CLI",
-      "status": "DONE",
-      "goal": "Implementación de Relevo, Auto-Auditoría y Suite de Tests nativos.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-03",
-          "label": "CLI",
-          "desc": "Handover/Takeover",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-04",
-          "label": "GOV",
-          "desc": "Self-Audit Mechanism",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-05",
-          "label": "TEST",
-          "desc": "Telemetry Test Suite",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S06-CLI",
-      "name": "Endurecimiento del CLI (gov)",
-      "status": "DONE",
-      "goal": "Refactorización y robustez de comandos core (act, audit, status).",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S06-01",
-          "label": "CLI",
-          "desc": "Harden CLI core commands",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S07-GOV",
-      "name": "Gobernanza y Auditoría Estricta",
-      "status": "DONE",
-      "goal": "Implementación de auditoría profunda y validación de hashes.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S07-01",
-          "label": "GOV",
-          "desc": "Strict self-audit implementation",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S07-02",
-          "label": "GOV",
-          "desc": "Hash validation and strict audit",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S08-DPI",
-      "name": "Persistencia de Telemetría",
-      "status": "DONE",
-      "goal": "Implementar persistencia de CP y SHS en el historial.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S08-01",
-          "label": "TEL",
-          "desc": "Cognitive fatigue persistence",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S09-FINAL",
-      "name": "Cierre y Baseline Final",
-      "status": "DONE",
-      "goal": "Consolidación de telemetría y ejecución de Handover formal.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S09-01",
-          "label": "FINAL",
-          "desc": "Final telemetry consolidation and handover",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S10-FLEET",
-      "name": "Auditoría Transversal (Fleet Audit)",
-      "status": "DONE",
-      "goal": "Automatizar la auditoría secuencial de todos los repositorios del ecosistema Base2.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S10-01",
-          "label": "OPS",
-          "desc": "Creación del orquestador gov-fleet-audit",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S10-02",
-          "label": "CLI",
-          "desc": "Comando 'gov pack' para exportar ZIP de auditoría",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S11-HOTFIX",
-      "name": "Mitigación Crítica (Prioridad 0)",
-      "status": "DONE",
-      "goal": "Remediar vulnerabilidades explotables en cadena y Audit Gap del empaquetador.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S11-01",
-          "label": "SEC",
-          "desc": "PackEngine Audit Gap Fix (VUL-10, VUL-13)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S11-02",
-          "label": "SEC",
-          "desc": "Vanguard Authorization Fixes (VUL-05, VUL-06)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S11-03",
-          "label": "SEC",
-          "desc": "Session Lock HMAC (VUL-16)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S12-INTEGRITY",
-      "name": "Integridad Criptográfica & Vault",
-      "status": "DONE",
-      "goal": "Blindaje de firmas y validaciones cruzadas (Prioridad 1).",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S12-01",
-          "label": "SEC",
-          "desc": "SignEngine & CLI Key Hardening (VUL-01, VUL-02)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S12-02",
-          "label": "SEC",
-          "desc": "Cross-Validation & Manifest Signatures (VUL-07, VUL-08)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S13-IMMUTABILITY",
-      "name": "Inmutabilidad y Anti-Evasión",
-      "status": "DONE",
-      "goal": "Prevenir Path Traversal, ZipSlip y envenenamiento de Ledger (Prioridad 2).",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S13-01",
-          "label": "GOV",
-          "desc": "ForensicLedger Mutex & Anchoring (VUL-11, VUL-12)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S13-02",
-          "label": "SEC",
-          "desc": "Path Traversal & ZipSlip Protection (VUL-14, VUL-19)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S13-03",
-          "label": "SEC",
-          "desc": "Orphan Substring Bypass Fix (VUL-09)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S14-ERGONOMICS",
-      "name": "Deuda Técnica y Pulido",
-      "status": "DONE",
-      "goal": "Mejoras operativas no bloqueantes (Prioridad 3).",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S14-01",
-          "label": "PERF",
-          "desc": "Code Debt & Polling (VUL-03, VUL-04, VUL-23)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S15-SYMBIOSIS",
-      "name": "Generador de Contexto",
-      "status": "DONE",
-      "goal": "Implementar 'gov context' para focalización de la IA.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S15-01",
-          "label": "AI-CORE",
-          "desc": "Generador de Contexto (gov context)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S15-02",
-          "label": "OPS",
-          "desc": "Ganchos Nativos Inescapables (gov hook install)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S15-03",
-          "label": "CLI",
-          "desc": "Simulador de Vuelo / Dry-Run (gov act --dry-run)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S16-FACTORY-OPS",
-      "name": "Automatización de Operaciones",
-      "status": "DONE",
-      "goal": "Auto-Commit semántico y trazabilidad total.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S16-01",
-          "label": "OPS",
-          "desc": "Auto-Commit Semántico y Estandarizado",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S16-02",
-          "label": "SEC",
-          "desc": "Kill-Switch de Sesiones Zombie",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S16-03",
-          "label": "PERF",
-          "desc": "Mecanismo Anti-Loop (CLI Rate Limiting)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S17-RELIABILITY",
-      "name": "Integridad de Pruebas (TestGuard)",
-      "status": "DONE",
-      "goal": "Integrar ejecución obligatoria de tests en el baseline.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S17-01",
-          "label": "QA",
-          "desc": "TestGuard Integration",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S17-02",
-          "label": "SEC",
-          "desc": "Reconstitution Engine (gov restore)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S18-UNIVERSAL-GOV",
-      "name": "Reporteo Avanzado y Roles",
-      "status": "DONE",
-      "goal": "Generación de reportes ejecutivos con atribución de roles.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S18-01",
-          "label": "ARCH",
-          "desc": "Dynamic Scope Engine (gov.yaml)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S18-02",
-          "label": "GOV",
-          "desc": "Advanced Reporting (gov report with Roles)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S19-FORTRESS",
-      "name": "Búnker de Criptografía (Strategic Hardening)",
-      "status": "DONE",
-      "goal": "Elevar los estándares de seguridad a grado militar y cerrar brechas de autorización.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S19-01",
-          "label": "SEC",
-          "desc": "Rotación de claves a RSA-2048 (VUL-PRO-01)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S19-02",
-          "label": "SEC",
-          "desc": "Apretón de manos RSA Táctico (Handover obligatorio)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S19-03",
-          "label": "GOV",
-          "desc": "Auditor Forense Anti-Tamper (Chain Verification)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S20-PROD",
-      "name": "Ejecución de Pase a Producción (BASE2)",
-      "status": "DONE",
-      "goal": "Deprecación legacy, endurecimiento FORTRESS y sellado de kernel de producción.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S20-01",
-          "label": "OPS",
-          "desc": "Deprecación Legacy (PS1/OPS deletion)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S20-02",
-          "label": "SEC",
-          "desc": "Auditoría y Sellado Atómico (100% Test Pass)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S20-03",
-          "label": "GOV",
-          "desc": "Cierre y Relevo Prod (Handover Sealed)",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S21-RESTORE",
-      "name": "Restauración de Integridad Nucleo",
-      "status": "DONE",
-      "goal": "Purga de autoSign, hardcode de reglas SHS y verificación Git-Zero.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S21-01",
-          "label": "SEC",
-          "desc": "Purga de autoSign y Verificación Estricta RSA",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S21-02",
-          "label": "SEC",
-          "desc": "Hardcode de Reglas SHS como Constantes",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S21-03",
-          "label": "GOV",
-          "desc": "Bloqueo Git-Zero Pre-Baseline",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S21-04",
-          "label": "OPS",
-          "desc": "Compilación y Cierre S21",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S22-LEDGER",
-      "name": "Ledger y Continuidad de Sesión",
-      "status": "DONE",
-      "goal": "Implementación de Cadena de History y Relay Atómico con Git-Hash.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S22-01",
-          "label": "GOV",
-          "desc": "Ledger Chain of Trust (Encadenamiento)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S22-02",
-          "label": "GOV",
-          "desc": "Relay Atómico con Git-Hash",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S22-03",
-          "label": "QA",
-          "desc": "Verificación y Cierre S22",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S23-VANGUARD",
-      "name": "Integración del Agente Vanguard",
-      "status": "DONE",
-      "goal": "Migración atómica del Oráculo externo al Kernel de Gobernanza.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S23-01",
-          "label": "ARCH",
-          "desc": "Migración Atómica del Vanguard Agent",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S24-BLACKGATE",
-      "name": "Cierre de Producción",
-      "status": "DONE",
-      "goal": "Implementación de BLACK-GATE Trigger y cierre final de la hoja de ruta.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S24-01",
-          "label": "GOV",
-          "desc": "Detección de Cambios en Núcleo (BLACK-GATE)",
-          "status": "DONE"
-        },
-        {
-          "id": "TASK-DPI-S24-05",
-          "label": "OPS",
-          "desc": "Cierre Final de Producción",
-          "status": "DONE"
-        }
-      ]
-    },
-    {
-      "id": "S25-SATURATION",
-      "name": "Enforcement de Saturación y Precisión del Motor",
-      "status": "DONE",
-      "goal": "Convertir el sistema de saturación de informativo a coercitivo: Hard Gate en gov act, CUS operativo, Dual Dial en Vanguard, wizards robustos, fleet pulse automático.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S25-01",
-          "label": "GOV",
-          "desc": "Hard Gate en gov act — bloquear ejecución cuando saturation >= 80% con exit code 1",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S25-02",
-          "label": "GOV",
-          "desc": "Conectar incrementTurns al flujo de gov act y gov baseline para hacer CUS operativo",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S25-03",
-          "label": "UI",
-          "desc": "Dual Dial minimalista en Vanguard — BHI y CUS como indicadores separados en TerminalTab",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        },
-        {
-          "id": "TASK-DPI-S25-04",
-          "label": "UI",
-          "desc": "Mejoras UX al botón Emergency Handover — confirmación modal y estado visual post-handover",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        },
-        {
-          "id": "TASK-DPI-S25-05",
-          "label": "GOV",
-          "desc": "Corregir wizards DPI-INIT y DPI-ADOPT — rutas correctas, flag --commit en adopt, registro en fleet",
-          "status": "DONE",
-          "required_signatures": ["ARCH", "DEV"]
-        },
-        {
-          "id": "TASK-DPI-S25-06",
-          "label": "TEL",
-          "desc": "Fleet Pulse auto-update — gov pulse debe actualizar fleet_pulse.json en cada heartbeat",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S25-07",
-          "label": "OPS",
-          "desc": "Eliminar hardcoded paths en main.dart y leer versión dinámicamente desde backlog.json",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        },
-        {
-          "id": "TASK-DPI-S25-08",
-          "label": "UI",
-          "desc": "Mostrar fecha del último git push en el panel de telemetría de Vanguard",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        }
-      ]
-    },
-    {
-      "id": "S26-DEBT",
-      "name": "Deuda Técnica y Term-UI",
-      "status": "DONE",
-      "goal": "Implementación de visualización nativa en terminal y resolver deuda de usabilidad.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S26-01",
-          "label": "DEBT",
-          "desc": "Implementación del Dashboard Term-UI para telemetría consolidada en consola",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        }
-      ]
-    },
-    {
-      "id": "S27-TOKEN-AWARENESS",
-      "name": "Consciencia de Tokens (SHS-PRESSURE)",
-      "status": "DONE",
-      "goal": "Implementar detección proactiva de límites de salida del modelo (MAX_TOKENS) e integrar presión de tokens en el SHS.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S27-01",
-          "label": "GOV",
-          "desc": "AI-LOG-CRAWLER: Detección de finish_reason: MAX_TOKENS en logs de sesión.",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S27-02",
-          "label": "TEL",
-          "desc": "METRIC-EXPANSION: Cálculo de output_utilization y exposición en ContextState.",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S27-03",
-          "label": "GOV",
-          "desc": "SHS-WEIGHTING: Integración de presión de salida en el pesaje del CUS.",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        }
-      ]
-    },
-    {
-      "id": "S28-FLEET-DECOUPLING",
-      "name": "Orquestación y Desacoplamiento (GOLD-SSOT)",
-      "status": "DONE",
-      "goal": "Finalizar la segregación de Base2, implementar dashboard de flota y automatizar el despliegue agnóstico.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S28-01",
-          "label": "UI",
-          "desc": "DASHBOARD-V2: Visualización de flota multinodo en Vanguard Agent.",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        },
-        {
-          "id": "TASK-DPI-S28-02",
-          "label": "ARCH",
-          "desc": "SERVICE-REFACTOR: Migración de Pulse Aggregator a lib/src/services/.",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S28-03",
-          "label": "OPS",
-          "desc": "AGNOSTIC-INSTALLER: Creación del seed_installer.ps1 maestro.",
-          "status": "DONE",
-          "required_signatures": ["DEV"]
-        },
-        {
-          "id": "TASK-DPI-S28-04",
-          "label": "DOC",
-          "desc": "METRICS-SPEC: Documentación técnica del protocolo de cálculo SHS, CUS y BHI.",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        }
-      ]
-    },
-    {
-      "id": "S29-NUCLEUS-V9",
-      "name": "NUCLEUS-V9: Anti-Hallucination Engine",
-      "status": "DONE",
-      "goal": "Migración al kernel v9.0.0 con telemetría determinista y estados de seguridad independientes.",
-      "tasks": [
-        {
-          "id": "TASK-DPI-S29-01",
-          "label": "ARCH",
-          "desc": "Kernel Baseline v9.0.0 & Constant Verification (CONTEXT_WINDOW, OUTPUT_LIMIT)",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S29-02",
-          "label": "TEL",
-          "desc": "Hot-Capture Interceptor & sessionLog Persistence implementation",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S29-03",
-          "label": "TEL",
-          "desc": "Master CUS Redesign: Deterministic Context Pressure Formula",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S29-04",
-          "label": "GOV",
-          "desc": "Independent State Evaluator & Protocol Triggers (LOCKED, SECURITY_HOLD)",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S29-05",
-          "label": "DOC",
-          "desc": "Base2 Midpoint Integration Report & Impact Audit",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        },
-        {
-          "id": "TASK-DPI-S29-06",
-          "label": "SEC",
-          "desc": "Security Hold & Critical Preservation Logic (Write-Lock)",
-          "status": "DONE",
-          "required_signatures": ["ARCH"]
-        }
-      ]
-    }
-  ],
-  "current_sprint": "S29-NUCLEUS-V9",
-  "current_task": "COMPLETED",
-  "version": "9.0.1"
+    "project":  "Antigravity DPI",
+    "sprints":  [
+                    {
+                        "id":  "A01-GOVERNANCE-EVO",
+                        "name":  "EvoluciÃ³n de Gobernanza: Serie A",
+                        "status":  "IN_PROGRESS",
+                        "goal":  "Reinicio de la Fábrica, integraciÃ³n de flota y propagaciÃ³n en cascada de binarios v9.0.1.",
+                        "tasks":  [
+                                      {
+                                          "id":  "TASK-A01-01",
+                                          "label":  "GOV",
+                                          "desc":  "BACKLOG-REFRACTOR: MigraciÃ³n a Serie A y creaciÃ³n de BACKLOG_ARCHIVE.json.",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "id":  "TASK-A01-02",
+                                          "label":  "ARCH",
+                                          "desc":  "SENTINEL-CORE: ExpansiÃ³n de cobertura de ADN (v9.1.0) y eliminaciÃ³n de puntos ciegos.",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "id":  "TASK-A01-03",
+                                          "label":  "UI",
+                                          "desc":  "VANGUARD-DASHBOARD: DiferenciaciÃ³n de proyectos en el HUD y telemetrÃ­a por nodo.",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "id":  "TASK-A01-04",
+                                          "label":  "GOV",
+                                          "desc":  "PURGE-SATURATION: ProtÃ³colo de purga estructural y reseteo de ADN (SHS recovery).",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "id":  "TASK-A01-05",
+                                          "label":  "GOLD",
+                                          "desc":  "SENTINEL-AUTOMATION: Registro de versión en nodos y sincronizaciÃ³n de cascada.",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "id":  "TASK-A01-06",
+                                          "label":  "CERT",
+                                          "desc":  "SENTINEL-ISOLATION: CertificaciÃ³n de Isomorfismo y AuditorÃ­a Forense CUS.",
+                                          "status":  "DONE"
+                                      },
+                                      {
+                                          "label":  "GOLD",
+                                          "status":  "DONE",
+                                          "id":  "TASK-A01-07",
+                                          "desc":  "TELEMETRY-FIX: Resolución de persistencia de session_uuid y sincronización de flota v9.2.2."
+                                      }
+                                  ]
+                    },
+                    {
+                        "status":  "DONE",
+                        "tasks":  [
+                                      {
+                                          "label":  "DOC",
+                                          "status":  "DONE",
+                                          "id":  "TASK-A02-01",
+                                          "desc":  "FACTORY-DOCS: Creación de FACTORY_OPERATIONS.md."
+                                      },
+                                      {
+                                          "label":  "GOLD",
+                                          "status":  "DONE",
+                                          "id":  "TASK-A02-02",
+                                          "desc":  "DNA-RESEAL: Re-sellado masivo de flota (Base2, miniduo)."
+                                      },
+                                      {
+                                          "label":  "UPGRADE",
+                                          "status":  "DONE",
+                                          "id":  "TASK-A02-03",
+                                          "desc":  "NUCLEUS-EVO: Despliegue de Kernel v9.3.0."
+                                      }
+                                  ],
+                        "name":  "Estabilización de Fábrica: Serie A",
+                        "id":  "A02-FACTORY-STABILIZATION",
+                        "goal":  "Certificación de procesos de replicación y re-sellado masivo de ADN v9.3.0."
+                    },
+                    {
+                        "status": "IN_PROGRESS",
+                        "id": "A07-KERNEL-HARDENING",
+                        "name": "Blindaje del Motor: Serie A (v9.15.0)",
+                        "goal": "Implementar la Puerta de Veracidad, el Escudo UI/UX y el sistema de Fricción Táctica en gov.exe.",
+                        "tasks": [
+                            { "id": "A07-01", "label": "ARCH", "desc": "Veracity Gate: EjecuciÃ³n mandatoria de tests en audit/handover.", "status": "PENDING" },
+                            { "id": "A07-02", "label": "ARCH", "desc": "Rule Lockdown: Bloqueo de subversión de reglas (GEMINI/VISION).", "status": "PENDING" },
+                            { "id": "A07-03", "label": "GOV", "desc": "UI/UX Veracity Shield: Cero warnings/lints en la Puerta de Hierro.", "status": "PENDING" },
+                            { "id": "A07-04", "label": "GOV", "desc": "Tactical Friction: Pitidos, Flashes y PresiÃ³n Sostenida.", "status": "PENDING" },
+                            { "id": "A07-05", "label": "GOLD", "desc": "Core Build v9.4.0: GeneraciÃ³n de binarios certificados.", "status": "PENDING" },
+                            { "id": "A07-06", "label": "ARCH", "desc": "Script-Gear Sync: Alineación de scripts internos .ps1.", "status": "PENDING" }
+                        ]
+                    },
+                    {
+                        "status": "PENDING",
+                        "id": "A08-AUTHORITY-VAULT",
+                        "name": "Consejo de Oráculos Multi-Agente: Serie A",
+                        "goal": "Instanciar la flota de IAs con identidades RSA y OrÃ¡culo BIZ Colegiado.",
+                        "tasks": [
+                            { "id": "A08-01", "label": "BIZ", "desc": "Manifiesto Multi-Agente: Definición de perfiles BIZ (Finanzas, Ops, Estrategia).", "status": "PENDING" },
+                            { "id": "A08-02", "label": "GOV", "desc": "Agent IDs: GeneraciÃ³n de claves RSA independientes para cada IA.", "status": "PENDING" },
+                            { "id": "A08-03", "label": "ARCH", "desc": "Multi-Sig Engine v2: Consenso Colegiado y Veto por Dominio.", "status": "PENDING" },
+                            { "id": "A08-04", "label": "GOV", "desc": "Authority Snapshots: Trazabilidad forense por cambio de visión.", "status": "PENDING" },
+                            { "id": "A08-05", "label": "BIZ", "desc": "Role Registry: Firma y SoberanÃ­a de Dominio Modular.", "status": "PENDING" }
+                        ]
+                    },
+                    {
+                        "status": "PENDING",
+                        "id": "A09-EXCELLENCE-RESILIENCE",
+                        "name": "Resiliencia y MitigaciÃ³n de GAPs: Serie A",
+                        "goal": "Resolver riesgos residuales y optimizar el ciclo de decisiÃ³n PO-IA antes de la propagaciÃ³n.",
+                        "tasks": [
+                            { "id": "A09-01", "label": "GOV", "desc": "PO Consult Circuit: Estado AWAITING_PO_DIRECTION en el binario.", "status": "PENDING" },
+                            { "id": "A09-02", "label": "SEC", "desc": "Shamir Secret: Protocolo de recuperación de llave maestra (Sharding).", "status": "PENDING" },
+                            { "id": "A09-03", "label": "INTEL", "desc": "Intel Hook: Sonda de monitoreo de vulnerabilidades externas.", "status": "PENDING" },
+                            { "id": "A09-04", "label": "QA", "desc": "UI Smoke Verification: NavegaciÃ³n autÃ³noma pre-handover.", "status": "PENDING" }
+                        ]
+                    },
+                    {
+                        "status": "PENDING",
+                        "id": "A10-FLEET-PROPAGATION",
+                        "name": "Alineación de Fábrica / Propagación: Serie A",
+                        "goal": "Propagar el estándar v9.4.0 final y certificar la veracidad en toda la flota.",
+                        "tasks": [
+                            { "id": "A10-01", "label": "GOV", "desc": "Cascada Binaria: Push de gov.exe v9.4.0 a Base2 y miniduo.", "status": "PENDING" },
+                            { "id": "A10-02", "label": "QA", "desc": "Veracity Audit: CertificaciÃ³n de salud nominal global.", "status": "PENDING" },
+                            { "id": "A10-03", "label": "BIZ", "desc": "Provisionamiento BIZ: configuración de Oráculos Locales.", "status": "PENDING" },
+                            { "id": "A10-04", "label": "OPS", "desc": "Fleet Master Sync: ImplementaciÃ³n de orquestador de despliegue.", "status": "PENDING" }
+                        ]
+                    },
+                    {
+                        "status": "PENDING",
+                        "id": "A11-COMPLIANCE-FINAL",
+                        "name": "Cumplimiento Forense y Sellado: Serie A",
+                        "goal": "AuditorÃ­a integral del cumplimiento de todos los sprints y tareas.",
+                        "tasks": [
+                            { "id": "A11-01", "label": "AUDIT", "desc": "AuditorÃ­a Forense: CertificaciÃ³n de Certeza en toda la Serie A.", "status": "PENDING" },
+                            { "id": "A11-02", "label": "GOV", "desc": "Sello Final: Handover AtÃ³mico v9.15.0.", "status": "PENDING" }
+                        ]
+                    }
+                ],
+    "current_sprint":  "A07-KERNEL-HARDENING",
+    "current_task":  "A07-01",
+    "version":  "9.4.0-DEV",
+    "kernel_version":  "9.3.0"
 }

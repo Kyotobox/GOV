@@ -3,17 +3,14 @@ import 'package:watcher/watcher.dart';
 import 'package:path/path.dart' as p;
 import '../services/pulse_aggregator.dart';
 import '../dash/dashboard_engine.dart';
-import 'telemetry_service.dart';
 
 /// Monitor: Implements the Watch Mode for real-time telemetry and dashboard syncing.
 class TelemetryMonitor {
   final String basePath;
   late final DashboardEngine _dashboard;
-  late final TelemetryService _telemetry;
 
   TelemetryMonitor({required this.basePath}) {
     _dashboard = DashboardEngine();
-    _telemetry = TelemetryService(basePath: basePath);
   }
 
   /// Starts the watcher on vault/intel/ and .meta/

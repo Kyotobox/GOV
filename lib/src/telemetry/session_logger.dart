@@ -11,13 +11,15 @@ class SessionLogger {
 
   SessionLogger({required this.basePath});
 
-  File get _logFile => File(p.join(basePath, 'vault', 'intel', 'sessionLog.json'));
+  File get _logFile => File(p.join(basePath, 'vault', 'intel', 'session_log.json'));
 
   /// Captures a granular interaction and appends it to the volatile session log.
   Future<void> captureInteraction({
     required String type, // 'TOOL' | 'CHAT' | 'SYSTEM'
     String? detail,
     int tokens = 0,
+    int promptTokens = 0,
+    int outputTokens = 0,
     String? finishReason,
   }) async {
     List<Map<String, dynamic>> logs = await loadLogs();
@@ -26,7 +28,9 @@ class SessionLogger {
       'timestamp': DateTime.now().toIso8601String(),
       'type': type.toUpperCase(),
       'detail': detail ?? 'N/A',
-      'tokens': tokens,
+      'tokens': tokens > 0 ? tokens : (promptTokens + outputTokens),
+      'prompt_tokens': promptTokens,
+      'output_tokens': outputTokens,
       'finish_reason': finishReason ?? 'stop',
       // S29-SECURITY: Fingerprint for log-chaining (Local Integrity)
       'prev_hash': logs.isEmpty ? '00000000' : _calculateHash(logs.last),
